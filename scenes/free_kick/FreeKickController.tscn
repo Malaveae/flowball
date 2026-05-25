@@ -1,0 +1,156 @@
+[gd_scene load_steps=18 format=3]
+
+[ext_resource type="Script" path="res://scripts/state_machine/FreeKickController.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/state_machine/FreeKickStateMachine.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/state_machine/PowerState.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/state_machine/SupportFootState.gd" id="4"]
+[ext_resource type="Script" path="res://scripts/state_machine/BallContactState.gd" id="5"]
+[ext_resource type="Script" path="res://scripts/state_machine/CalculateShotState.gd" id="6"]
+[ext_resource type="Script" path="res://scripts/state_machine/ExecuteShotState.gd" id="7"]
+[ext_resource type="Script" path="res://scripts/state_machine/FeedbackState.gd" id="8"]
+[ext_resource type="Script" path="res://scripts/ui/FreeKickUI.gd" id="9"]
+[ext_resource type="Script" path="res://scripts/camera/FreeKickCameraRig.gd" id="10"]
+[ext_resource type="Script" path="res://scripts/telemetry/ShotObserver.gd" id="11"]
+[ext_resource type="Script" path="res://scripts/telemetry/TrajectoryGhost3D.gd" id="12"]
+[ext_resource type="Script" path="res://scripts/ui/SupportPlantPanel.gd" id="13"]
+[ext_resource type="Script" path="res://scripts/ui/BallContactPanel.gd" id="14"]
+
+[node name="FreeKickController" type="Node"]
+script = ExtResource("1")
+ball_path = NodePath("../Ball3D")
+kicker_path = NodePath("../Player3D")
+
+[node name="FreeKickStateMachine" type="Node" parent="."]
+script = ExtResource("2")
+
+[node name="PowerState" type="Node" parent="FreeKickStateMachine"]
+script = ExtResource("3")
+
+[node name="SupportFootState" type="Node" parent="FreeKickStateMachine"]
+script = ExtResource("4")
+
+[node name="BallContactState" type="Node" parent="FreeKickStateMachine"]
+script = ExtResource("5")
+
+[node name="CalculateShotState" type="Node" parent="FreeKickStateMachine"]
+script = ExtResource("6")
+
+[node name="ExecuteShotState" type="Node" parent="FreeKickStateMachine"]
+script = ExtResource("7")
+
+[node name="FeedbackState" type="Node" parent="FreeKickStateMachine"]
+script = ExtResource("8")
+
+[node name="FreeKickUI" type="CanvasLayer" parent="."]
+script = ExtResource("9")
+
+[node name="Root" type="Control" parent="FreeKickUI"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="PowerLabel" type="Label" parent="FreeKickUI/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+offset_left = 24.0
+offset_top = 20.0
+offset_right = 260.0
+offset_bottom = 52.0
+text = "Power: 0%"
+
+[node name="PowerBar" type="ProgressBar" parent="FreeKickUI/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+offset_left = 24.0
+offset_top = 54.0
+offset_right = 324.0
+offset_bottom = 82.0
+max_value = 100.0
+show_percentage = false
+value = 0.0
+
+[node name="SupportPanel" type="Panel" parent="FreeKickUI/Root"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+offset_left = 320.0
+offset_top = 130.0
+offset_right = 760.0
+offset_bottom = 570.0
+script = ExtResource("13")
+
+[node name="SupportMarker" type="ColorRect" parent="FreeKickUI/Root/SupportPanel"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 176.0
+offset_top = 176.0
+offset_right = 184.0
+offset_bottom = 184.0
+color = Color(1, 0.2, 0.1, 1)
+
+[node name="BallContactPanel" type="Panel" parent="FreeKickUI/Root"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+offset_left = 300.0
+offset_top = 90.0
+offset_right = 780.0
+offset_bottom = 570.0
+script = ExtResource("14")
+
+[node name="FeedbackLabel" type="Label" parent="FreeKickUI/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+offset_left = 24.0
+offset_top = 64.0
+offset_right = 980.0
+offset_bottom = 128.0
+text = "Feedback"
+
+[node name="StatusLabel" type="Label" parent="FreeKickUI/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+offset_left = 24.0
+offset_top = 540.0
+offset_right = 980.0
+offset_bottom = 574.0
+text = "State: ready"
+
+[node name="InstructionLabel" type="Label" parent="FreeKickUI/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+offset_left = 24.0
+offset_top = 640.0
+offset_right = 980.0
+offset_bottom = 700.0
+text = "Mouse: left hold = power, left drag = plant/contact, right click = restart, middle click = switch foot. Keyboard: Space/R/F."
+
+[node name="RestartButton" type="Button" parent="FreeKickUI/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+offset_left = 24.0
+offset_top = 590.0
+offset_right = 180.0
+offset_bottom = 628.0
+text = "Restart Loop"
+
+[node name="SwitchFootButton" type="Button" parent="FreeKickUI/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+offset_left = 192.0
+offset_top = 590.0
+offset_right = 348.0
+offset_bottom = 628.0
+text = "Switch Foot"
+
+[node name="FreeKickCameraRig" type="Node3D" parent="."]
+script = ExtResource("10")
+camera_path = NodePath("../../Camera3D")
+target_path = NodePath("../../Ball3D")
+
+[node name="ShotObserver" type="Node" parent="."]
+script = ExtResource("11")
+
+[node name="TrajectoryGhost3D" type="MeshInstance3D" parent="."]
+script = ExtResource("12")

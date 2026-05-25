@@ -1,0 +1,17 @@
+; Engine configuration file.
+; Godot 4 free kick prototype scaffold.
+
+config_version=5
+
+[application]
+config/name="Flowball Free Kick Prototype"
+run/main_scene="res://scenes/sandbox/FreeKickSandbox.tscn"
+config/features=PackedStringArray("4.3", "Jolt Physics")
+
+[physics]
+3d/physics_engine="Jolt Physics"
+
+[input]
+free_kick_power={"deadzone":0.5,"events":[Object(InputEventKey,"physical_keycode":32), Object(InputEventMouseButton,"button_index":1)]}
+free_kick_restart={"deadzone":0.5,"events":[Object(InputEventKey,"physical_keycode":82), Object(InputEventMouseButton,"button_index":2)]}
+free_kick_switch_foot={"deadzone":0.5,"events":[Object(InputEventKey,"physical_keycode":70), Object(InputEventMouseButton,"button_index":3)]}

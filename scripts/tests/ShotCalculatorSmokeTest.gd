@@ -8,6 +8,10 @@ func _init() -> void:
 	ok = _test_lower_contact_lifts_ball() and ok
 	ok = _test_center_contact_goes_straighter() and ok
 	ok = _test_side_swipe_adds_strong_curve() and ok
+	ok = _test_support_foot_angle_adjusts_aim() and ok
+	ok = _test_extended_follow_through_increases_curve() and ok
+	ok = _test_support_location_does_not_directly_aim() and ok
+	ok = _test_support_foot_side_is_physical() and ok
 	quit(0 if ok else 1)
 
 func _base_input(power: float = 0.7) -> FreeKickInputData:
@@ -109,6 +113,54 @@ func _test_side_swipe_adds_strong_curve() -> bool:
 	var curve := ShotCalculator.calculate(curve_input, _stats(), _environment(), _difficulty())
 	var passed := absf(curve.spin_axis.y) > absf(straight.spin_axis.y) and curve.spin_rate > straight.spin_rate * 2.0
 	_print_result("side swipe adds strong curve", passed)
+	return passed
+
+func _test_support_foot_angle_adjusts_aim() -> bool:
+	var left_angle_input := _base_input(0.75)
+	left_angle_input.support_vector = Vector2.ZERO
+	left_angle_input.support_foot_angle = PI
+	var right_angle_input := _base_input(0.75)
+	right_angle_input.support_vector = Vector2.ZERO
+	right_angle_input.support_foot_angle = 0.0
+	var left_angle := ShotCalculator.calculate(left_angle_input, _stats(), _environment(), _difficulty())
+	var right_angle := ShotCalculator.calculate(right_angle_input, _stats(), _environment(), _difficulty())
+	var passed := right_angle.horizontal_angle > left_angle.horizontal_angle
+	_print_result("support foot angle adjusts aim", passed)
+	return passed
+
+func _test_extended_follow_through_increases_curve() -> bool:
+	var short_input := _base_input(0.75)
+	short_input.impact_point = Vector2(0.2, 0.0)
+	short_input.swipe_points = PackedVector2Array([Vector2(0.2, 0.0), Vector2(0.45, -0.1)])
+	var long_input := _base_input(0.75)
+	long_input.impact_point = Vector2(0.2, 0.0)
+	long_input.swipe_points = PackedVector2Array([Vector2(0.2, 0.0), Vector2(1.65, -0.1)])
+	var short := ShotCalculator.calculate(short_input, _stats(), _environment(), _difficulty())
+	var long := ShotCalculator.calculate(long_input, _stats(), _environment(), _difficulty())
+	var passed := long.spin_rate > short.spin_rate and absf(long.spin_axis.y) >= absf(short.spin_axis.y)
+	_print_result("extended follow-through increases curve", passed)
+	return passed
+
+func _test_support_location_does_not_directly_aim() -> bool:
+	var left_plant := _base_input(0.75)
+	left_plant.support_vector = Vector2(-1.0, 0.0)
+	left_plant.support_foot_angle = 0.0
+	left_plant.impact_point = Vector2.ZERO
+	var right_plant := _base_input(0.75)
+	right_plant.support_vector = Vector2(1.0, 0.0)
+	right_plant.support_foot_angle = 0.0
+	right_plant.impact_point = Vector2.ZERO
+	var left := ShotCalculator.calculate(left_plant, _stats(), _environment(), _difficulty())
+	var right := ShotCalculator.calculate(right_plant, _stats(), _environment(), _difficulty())
+	var passed := absf(left.horizontal_angle - right.horizontal_angle) < 0.001
+	_print_result("support location does not directly aim", passed)
+	return passed
+
+func _test_support_foot_side_is_physical() -> bool:
+	var right_kick_marker := FreeKickInputMapper.clamp_to_support_foot_side(Vector2(120.0, 20.0), 160.0, "right")
+	var left_kick_marker := FreeKickInputMapper.clamp_to_support_foot_side(Vector2(-120.0, 20.0), 160.0, "left")
+	var passed := right_kick_marker.x < 0.0 and left_kick_marker.x > 0.0
+	_print_result("support foot side is physical", passed)
 	return passed
 
 func _print_result(label: String, passed: bool) -> void:

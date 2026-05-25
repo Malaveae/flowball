@@ -15,11 +15,12 @@ func enter(_controller: FreeKickController) -> void:
 	raw_points = PackedVector2Array()
 	controller.camera_rig.set_mode(&"BALL_CONTACT_UI")
 	controller.ui.show_ball_contact_ui()
+	controller.ui.set_status("Step 3: point on ball, then drag follow-through")
 
 func _process(delta: float) -> void:
 	elapsed += delta
 	controller.ui.align_ball_contact_overlay(controller.get_ball(), controller.camera_rig.get_camera())
-	controller.ui.set_status("State: CONTACT · %.1fs" % maxf(0.0, controller.difficulty.step3_time_limit - elapsed))
+	controller.ui.set_status("State: POINT + DRAG CONTACT · %.1fs" % maxf(0.0, controller.difficulty.step3_time_limit - elapsed))
 	if touching:
 		swipe_duration += delta
 	elif elapsed >= controller.difficulty.step3_time_limit:
@@ -57,6 +58,10 @@ func _input(event: InputEvent) -> void:
 	if should_add_point:
 		var ball_control := controller.ui.get_ball_contact_control()
 		var local := FreeKickInputMapper.screen_to_control_local(pos, ball_control)
+		if raw_points.is_empty():
+			local = local.limit_length(ball_radius_px)
+		else:
+			local = local.limit_length(ball_radius_px * 1.8)
 		raw_points.append(local)
 		controller.ui.update_ball_contact(raw_points)
 		get_viewport().set_input_as_handled()

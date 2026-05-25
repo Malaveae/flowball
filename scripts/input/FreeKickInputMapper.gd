@@ -15,9 +15,18 @@ static func clamp_to_support_sector(local_pos: Vector2, radius: float, selected_
 	delta = clampf(delta, -half_angle, half_angle)
 	return Vector2.from_angle(center_angle + delta) * distance
 
+static func clamp_to_support_foot_side(local_pos: Vector2, radius: float, selected_kicking_foot: String) -> Vector2:
+	# Step 2 physical rule: if the player kicks with the right foot, the planted/support foot is the left foot,
+	# so it must appear on the left side of the ball. Left-footed shots mirror this.
+	if radius <= 0.0:
+		return Vector2.ZERO
+	var support_side := -1.0 if selected_kicking_foot == "right" else 1.0
+	var min_side_distance := radius * 0.18
+	var side_x := clampf(absf(local_pos.x), min_side_distance, radius) * support_side
+	return Vector2(side_x, clampf(local_pos.y, -radius, radius))
+
 static func clamp_to_goal_aim_lane(local_pos: Vector2, radius: float) -> Vector2:
-	# Step 2 prototype mode: the straight support-foot line primarily selects first post / center / second post.
-	# X = target lane, Y = plant depth/body setup. Keep it readable instead of hiding aim inside a side sector.
+	# Backward-compatible helper for older prototypes.
 	if radius <= 0.0:
 		return Vector2.ZERO
 	return Vector2(clampf(local_pos.x, -radius, radius), clampf(local_pos.y, -radius, radius))
@@ -44,8 +53,14 @@ static func normalize_ball_contact(local_pos: Vector2, ball_radius_px: float) ->
 
 static func normalize_swipe_points(points: PackedVector2Array, ball_radius_px: float) -> PackedVector2Array:
 	var normalized := PackedVector2Array()
-	for point in points:
-		normalized.append(normalize_ball_contact(point, ball_radius_px))
+	if ball_radius_px <= 0.0:
+		return normalized
+	for i in range(points.size()):
+		var p := points[i] / ball_radius_px
+		# First point is physical impact on the ball. Follow-through may extend beyond the ball
+		# so a long sideways drag can intentionally create stronger curl.
+		var max_length := 1.0 if i == 0 else 1.8
+		normalized.append(p.limit_length(max_length))
 	return normalized
 
 static func contact_good_enough(points: PackedVector2Array, duration: float, ball_radius_px: float, threshold_multiplier: float = 1.0) -> bool:

@@ -46,19 +46,29 @@ func show_support_foot_sector(selected_foot: String, _difficulty: FreeKickDiffic
 	support_panel.visible = true
 	support_panel.set_foot(selected_foot)
 	support_panel.set_marker(Vector2.ZERO, false)
+	support_panel.set_foot_angle(0.0, false)
+	support_panel.set_substep_label("1/2: drag to set support-foot location")
 	support_marker.position = support_panel.size * 0.5 - support_marker.size * 0.5
 	feedback_label.visible = true
 	instruction_label.visible = true
-	instruction_label.text = "STEP 2 — AIM ONLY: drag red line to FIRST POST, CENTER, or SECOND POST. Ignore curl here; curl is Step 3. Release to confirm."
+	instruction_label.text = "STEP 2 — SUPPORT FOOT: white dot=ball, red dot=plant foot. Right-foot kick plants LEFT; left-foot kick plants RIGHT. Plant location sets body balance; foot angle aims."
 	feedback_label.text = "Plant setup: %s foot" % selected_foot
 	set_status("State: PLANT · foot: %s" % selected_foot)
 
 func update_support_marker(local_pos: Vector2) -> void:
 	support_panel.set_marker(local_pos, true)
 	support_marker.position = support_panel.size * 0.5 + local_pos - support_marker.size * 0.5
-	var aim := "SECOND POST" if local_pos.x > support_panel.sector_radius * 0.33 else "FIRST POST" if local_pos.x < -support_panel.sector_radius * 0.33 else "CENTER"
-	var plant := "open/curl" if local_pos.y < -18.0 else "close/drive" if local_pos.y > 18.0 else "balanced"
-	set_status("Support line target: %s · plant: %s · release to confirm" % [aim, plant])
+	var side := "LEFT of ball" if local_pos.x < 0.0 else "RIGHT of ball"
+	var plant := "ahead/open" if local_pos.y < -18.0 else "behind/closed" if local_pos.y > 18.0 else "level/balanced"
+	set_status("Substep 1/2: support foot %s · %s · release" % [side, plant])
+
+func update_support_foot_angle(angle: float) -> void:
+	support_panel.set_substep_label("2/2: drag around marker to set foot angle")
+	support_panel.set_foot_angle(angle, true)
+	var aim_adjust := cos(angle) * 6.0
+	var adjust_label := "aim right" if aim_adjust > 1.0 else "aim left" if aim_adjust < -1.0 else "neutral aim"
+	feedback_label.text = "Foot angle: %.0f° · %s · %.1f° correction" % [rad_to_deg(angle), adjust_label, aim_adjust]
+	set_status("Substep 2/2: %s · release to confirm" % adjust_label)
 
 func show_ball_contact_ui() -> void:
 	hide_all()
@@ -68,14 +78,34 @@ func show_ball_contact_ui() -> void:
 	ball_panel.clear_swipe()
 	feedback_label.visible = true
 	instruction_label.visible = true
-	instruction_label.text = "STEP 3 — CURL/HEIGHT: center+straight = straight. Lower = lift. Swipe left/right or hit side = curve. Bigger sideways swipe = more curl."
+	instruction_label.text = "STEP 3 — POINT + DRAG: press on the ball, then drag beyond it for follow-through. Longer sideways drag = stronger curl; lower start = lift; center+straight = clean power."
 	feedback_label.text = "Ball contact: choose impact point and swipe"
 	set_status("State: CONTACT · foreground ball touch")
 
 func update_ball_contact(points: PackedVector2Array) -> void:
 	ball_panel.set_swipe_points(points)
-	feedback_label.text = "Swipe points: %d" % points.size()
-	set_status("Contact swipe points: %d" % points.size())
+	feedback_label.text = _ball_contact_feedback(points)
+	set_status(_ball_contact_status(points))
+
+func _ball_contact_feedback(points: PackedVector2Array) -> String:
+	if points.is_empty():
+		return "Ball contact: point and drag"
+	var contact := points[0] / maxf(1.0, ball_panel.ball_radius_px)
+	var height := "lift" if contact.y > 0.25 else "drive" if contact.y < -0.25 else "medium height"
+	if points.size() < 2:
+		return "Contact: %s · now drag follow-through" % height
+	var follow := (points[points.size() - 1] - points[0]) / maxf(1.0, ball_panel.ball_radius_px)
+	var curl_strength := absf(follow.x) + absf(contact.x) * 0.75
+	var curl_side := "left" if follow.x < -0.12 else "right" if follow.x > 0.12 else "straight"
+	var curl_label := "LOW" if curl_strength < 0.35 else "MEDIUM" if curl_strength < 0.85 else "HIGH"
+	var length_label := "short" if follow.length() < 0.45 else "good" if follow.length() < 1.0 else "big"
+	return "Contact: %s · curl: %s %s · follow-through: %s" % [height, curl_label, curl_side, length_label]
+
+func _ball_contact_status(points: PackedVector2Array) -> String:
+	if points.size() < 2:
+		return "Step 3: hold on contact point, then drag"
+	var follow := (points[points.size() - 1] - points[0]) / maxf(1.0, ball_panel.ball_radius_px)
+	return "Step 3: sideways %.0f%% · length %.0f%% · release to shoot" % [absf(follow.x) * 100.0, follow.length() * 100.0]
 
 func align_ball_contact_overlay(ball: Node3D, camera: Camera3D, world_radius: float = 0.11) -> void:
 	if ball == null or camera == null or not ball_panel.visible:
@@ -93,13 +123,34 @@ func align_ball_contact_overlay(ball: Node3D, camera: Camera3D, world_radius: fl
 func show_feedback(report: Resource) -> void:
 	hide_all()
 	feedback_label.visible = true
+	feedback_label.position = Vector2(24.0, 96.0)
+	feedback_label.size = Vector2(1156.0, 134.0)
+	feedback_label.add_theme_font_size_override("font_size", 22)
+	var feedback_bg := StyleBoxFlat.new()
+	feedback_bg.bg_color = Color(0.02, 0.025, 0.035, 0.82)
+	feedback_bg.border_color = Color(0.15, 0.85, 1.0, 0.95)
+	feedback_bg.border_width_left = 3
+	feedback_bg.border_width_top = 3
+	feedback_bg.border_width_right = 3
+	feedback_bg.border_width_bottom = 3
+	feedback_bg.corner_radius_top_left = 10
+	feedback_bg.corner_radius_top_right = 10
+	feedback_bg.corner_radius_bottom_left = 10
+	feedback_bg.corner_radius_bottom_right = 10
+	feedback_bg.content_margin_left = 14
+	feedback_bg.content_margin_top = 10
+	feedback_bg.content_margin_right = 14
+	feedback_bg.content_margin_bottom = 10
+	feedback_label.add_theme_stylebox_override("normal", feedback_bg)
 	instruction_label.visible = true
-	instruction_label.text = "Feedback shown with cyan ghost trajectory. Right-click/R restarts. Middle-click/F switches foot."
+	instruction_label.text = "Feedback shown top-left with cyan ghost trajectory. Right-click/R restarts. Middle-click/F switches foot."
 	if report != null and report.get("summary") != null:
-		feedback_label.text = String(report.get("summary"))
+		feedback_label.text = "SHOT FEEDBACK\n" + String(report.get("summary"))
+		if report.get("peak_height") != null:
+			feedback_label.text += "\nPeak %.1fm · flight %.1fs · aim %.1f°" % [float(report.get("peak_height")), float(report.get("total_flight_time")), float(report.get("horizontal_angle"))]
 	else:
-		feedback_label.text = "Shot complete"
-	set_status("State: FEEDBACK")
+		feedback_label.text = "SHOT FEEDBACK\nShot complete"
+	set_status("State: FEEDBACK — read top-left shot feedback")
 
 func set_status(text: String) -> void:
 	status_label.text = text

@@ -8,6 +8,7 @@ extends Resource
 @export var support_touch_pos: Vector2 = Vector2.ZERO
 @export var support_vector: Vector2 = Vector2.ZERO
 @export_range(-1.0, 1.0, 0.001) var plant_depth: float = 0.0
+@export var support_foot_angle: float = 0.0 # radians, UI/world setup hint from Step 2 substep B.
 @export var support_timer_expired: bool = false
 @export var used_default_support: bool = false
 
@@ -24,6 +25,7 @@ func reset() -> void:
 	support_touch_pos = Vector2.ZERO
 	support_vector = Vector2.ZERO
 	plant_depth = 0.0
+	support_foot_angle = 0.0
 	support_timer_expired = false
 	used_default_support = false
 	impact_point = Vector2.ZERO

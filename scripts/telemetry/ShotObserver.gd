@@ -45,9 +45,26 @@ func build_report(_input_data: FreeKickInputData) -> FreeKickFeedbackReport:
 		report.shot_type = shot_params.shot_type
 		report.power = shot_params.power
 		report.spin_rate = shot_params.spin_rate
+		report.elevation_angle = shot_params.elevation_angle
+		report.horizontal_angle = shot_params.horizontal_angle
+		report.curl_direction = _curl_direction(shot_params)
+		report.curl_strength = _curl_strength(shot_params.spin_rate, shot_params.spin_axis.y)
 	if telemetry != null:
 		report.outcome = telemetry.final_outcome
 		report.peak_height = telemetry.peak_height
 		report.total_flight_time = telemetry.total_flight_time
-	report.summary = "Shot %s · %s · power %d%% · spin %.1f rad/s" % [String(report.outcome), String(report.shot_type), roundi(report.power * 100.0), report.spin_rate]
+	report.summary = "Shot %s · %s · power %d%% · curl %s %s · elev %.0f°" % [String(report.outcome), String(report.shot_type), roundi(report.power * 100.0), String(report.curl_strength), String(report.curl_direction), report.elevation_angle]
 	return report
+
+func _curl_direction(params: ShotParams) -> StringName:
+	if absf(params.spin_axis.y) < 0.18 or params.spin_rate < 18.0:
+		return &"straight"
+	return &"right" if params.spin_axis.y > 0.0 else &"left"
+
+func _curl_strength(spin_rate: float, side_axis: float) -> StringName:
+	var visible_spin := spin_rate * absf(side_axis)
+	if visible_spin < 28.0:
+		return &"low"
+	if visible_spin < 75.0:
+		return &"medium"
+	return &"high"

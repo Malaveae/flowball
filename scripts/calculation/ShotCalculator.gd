@@ -5,7 +5,7 @@ const MIN_LAUNCH_SPEED := 12.0
 const MAX_LAUNCH_SPEED := 36.0
 const MIN_ELEVATION_DEG := -3.0
 const MAX_ELEVATION_DEG := 35.0
-const MAX_SPIN_RATE := 90.0
+const MAX_SPIN_RATE := 140.0
 const MAX_HORIZONTAL_OFFSET_DEG := 25.0
 const IDEAL_POWER_MAX := 0.85
 
@@ -19,6 +19,7 @@ static func calculate(
 	params.power = clamp(input.power_normalized, 0.0, 1.0)
 	params.support_vector = input.support_vector
 	params.plant_depth = clamp(input.plant_depth, -1.0, 1.0)
+	params.support_foot_angle = input.support_foot_angle
 	params.contact_point = input.impact_point
 
 	var accuracy := stats.normalized(stats.free_kick_accuracy)
@@ -37,8 +38,11 @@ static func calculate(
 	params.stability = _plant_stability(params.plant_depth)
 	# Step 2 is now pure aiming/body setup. Curl comes from Step 3 contact + swipe.
 	params.curve_bias = 0.0
+	var foot_angle_offset := _support_foot_angle_offset(input.support_foot_angle)
+	# Support foot side is physical placement. It should not aim the shot directly anymore.
+	# Aim is fine-tuned by foot angle; curl/contact comes later in Step 3.
 	params.horizontal_angle = clampf(
-		input.support_vector.x * MAX_HORIZONTAL_OFFSET_DEG + environment.angle_to_goal,
+		foot_angle_offset + environment.angle_to_goal,
 		-MAX_HORIZONTAL_OFFSET_DEG,
 		MAX_HORIZONTAL_OFFSET_DEG
 	)
@@ -78,6 +82,11 @@ static func _launch_velocity(base_direction: Vector3, horizontal_deg: float, ele
 static func _plant_stability(plant_depth: float) -> float:
 	# Middle plant is most stable; extremes prepare special shots but reduce precision.
 	return clampf(1.0 - absf(plant_depth) * 0.35, 0.55, 1.0)
+
+static func _support_foot_angle_offset(angle: float) -> float:
+	# Step 2 substep B: foot angle fine-tunes horizontal aim.
+	# 0 rad points screen/right; convert mostly from the horizontal component to a small aim correction.
+	return clampf(cos(angle) * 6.0, -6.0, 6.0)
 
 static func _curve_bias_from_support(support_x: float, selected_foot: String) -> float:
 	var foot_sign := -1.0 if selected_foot == "right" else 1.0
@@ -119,7 +128,7 @@ static func _spin_rate(input: FreeKickInputData, swipe_length: float, curve_stat
 	var lateral_action := absf(input.impact_point.x) + absf(swipe_vector.x)
 	var vertical_action := absf(input.impact_point.y) + absf(swipe_vector.y)
 	# Center + straight/short swipe should be close to a knuckle/straight strike, not a high-spin curl.
-	var spin_intent := clampf(maxf(lateral_action, vertical_action * 0.8), 0.0, 1.0)
+	var spin_intent := pow(clampf(maxf(lateral_action, vertical_action * 0.8), 0.0, 1.0), 1.35)
 	if contact_offset < 0.16 and absf(swipe_vector.x) < 0.10:
 		spin_intent *= 0.35
 	var rate := lerpf(0.0, MAX_SPIN_RATE, spin_intent) * lerpf(1.25, 2.15, curve_stat) * lerpf(0.95, 1.25, technique)
@@ -150,8 +159,10 @@ static func _error_cone(accuracy: float, technique: float, stability: float, ove
 
 static func _deterministic_error(input: FreeKickInputData, error_cone_degrees: float) -> Vector2:
 	# Stable pseudo-random-ish error from raw input. Replace with seeded RNG if match replay needs explicit seed storage.
-	var seed_value := sin(input.hold_time * 12.9898 + input.support_vector.x * 78.233 + input.impact_point.y * 37.719)
-	var seed2 := cos(input.power_normalized * 91.17 + input.support_vector.y * 11.37 + input.impact_point.x * 43.11)
+	# Plant depth can influence consistency, but lateral support-foot side is constrained by kicking foot
+	# and must not secretly aim the shot through deterministic error.
+	var seed_value := sin(input.hold_time * 12.9898 + input.plant_depth * 78.233 + input.impact_point.y * 37.719)
+	var seed2 := cos(input.power_normalized * 91.17 + input.plant_depth * 11.37 + input.impact_point.x * 43.11)
 	return Vector2(seed_value, seed2) * error_cone_degrees * 0.35
 
 static func _classify_shot(params: ShotParams, swipe: Vector2) -> StringName:

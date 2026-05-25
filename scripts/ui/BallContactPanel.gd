@@ -38,15 +38,28 @@ func _draw() -> void:
 	draw_string(font, center + Vector2(-56, 20), "CENTER = CLEAN / POWER", HORIZONTAL_ALIGNMENT_CENTER, 220.0, 14, Color.WHITE)
 	draw_string(font, center + Vector2(-ball_radius_px + 14, 4), "LEFT\nCURL", HORIZONTAL_ALIGNMENT_LEFT, 90.0, 15, guide_color)
 	draw_string(font, center + Vector2(ball_radius_px - 62, 4), "RIGHT\nCURL", HORIZONTAL_ALIGNMENT_LEFT, 95.0, 15, guide_color)
-	draw_string(font, center + Vector2(-70, ball_radius_px + 24), "More sideways swipe = more curve", HORIZONTAL_ALIGNMENT_LEFT, 250.0, 14, Color(1.0, 0.92, 0.35, 0.95))
+	draw_string(font, center + Vector2(-88, ball_radius_px + 24), "Drag outside ball = stronger follow-through", HORIZONTAL_ALIGNMENT_LEFT, 320.0, 14, Color(1.0, 0.92, 0.35, 0.95))
 
-	# Swipe visualization.
+	# Contact + follow-through visualization.
 	if raw_points.size() > 0:
 		var first := center + raw_points[0]
-		draw_circle(first, 7.0, Color(1.0, 0.9, 0.25, 1.0))
+		draw_circle(first, 10.0, Color(1.0, 0.9, 0.25, 1.0))
+		draw_arc(first, 16.0, 0.0, TAU, 32, Color(0.0, 0.0, 0.0, 0.85), 2.0)
+		draw_string(font, first + Vector2(12, -12), "CONTACT", HORIZONTAL_ALIGNMENT_LEFT, 100.0, 12, Color(1.0, 0.95, 0.4, 1.0))
 		for i in range(1, raw_points.size()):
 			var a := center + raw_points[i - 1]
 			var b := center + raw_points[i]
-			draw_line(a, b, swipe_color, 4.0)
+			draw_line(a, b, swipe_color, 5.0)
 		var last := center + raw_points[raw_points.size() - 1]
-		draw_circle(last, 5.0, Color(1.0, 0.55, 0.15, 1.0))
+		if raw_points.size() >= 2:
+			draw_circle(last, 6.0, Color(1.0, 0.55, 0.15, 1.0))
+			var follow := last - first
+			var curl_strength := clampf(absf(follow.x) / maxf(1.0, ball_radius_px), 0.0, 1.8)
+			var meter_rect := Rect2(center.x - ball_radius_px, center.y + ball_radius_px + 44.0, ball_radius_px * 2.0, 10.0)
+			draw_rect(meter_rect, Color(0.0, 0.0, 0.0, 0.45), true)
+			draw_rect(Rect2(meter_rect.position, Vector2(meter_rect.size.x * clampf(curl_strength / 1.4, 0.0, 1.0), meter_rect.size.y)), Color(1.0, 0.55, 0.08, 0.95), true)
+			draw_string(font, meter_rect.position + Vector2(0, 28), "CURL METER", HORIZONTAL_ALIGNMENT_LEFT, 160.0, 12, Color(1.0, 0.8, 0.3, 1.0))
+			if follow.length() > 8.0:
+				var dir := follow.normalized()
+				draw_line(last, last - dir.rotated(0.45) * 18.0, swipe_color, 4.0)
+				draw_line(last, last - dir.rotated(-0.45) * 18.0, swipe_color, 4.0)

@@ -9,6 +9,7 @@ func _init() -> void:
 	ok = _test_center_contact_goes_straighter() and ok
 	ok = _test_side_swipe_adds_strong_curve() and ok
 	ok = _test_right_half_contact_with_left_support_curls_left() and ok
+	ok = _test_right_half_contact_with_right_support_curls_left() and ok
 	ok = _test_support_aim_target_adjusts_aim() and ok
 	ok = _test_support_aim_target_reaches_goal_side() and ok
 	ok = _test_spot_angle_is_not_double_counted() and ok
@@ -128,6 +129,18 @@ func _test_right_half_contact_with_left_support_curls_left() -> bool:
 	var magnus := curve.spin_axis.normalized().cross(curve.launch_velocity.normalized())
 	var passed := magnus.x < 0.0
 	_print_result("right half contact with left support curls left", passed)
+	return passed
+
+func _test_right_half_contact_with_right_support_curls_left() -> bool:
+	var curve_input := _base_input(0.75)
+	curve_input.selected_foot = "left"
+	curve_input.support_vector = Vector2(0.45, 0.0)
+	curve_input.impact_point = Vector2(0.55, 0.0)
+	curve_input.swipe_points = PackedVector2Array([Vector2(0.55, 0.0), Vector2(1.2, -0.1)])
+	var curve := ShotCalculator.calculate(curve_input, _stats(), _environment(), _difficulty())
+	var magnus := curve.spin_axis.normalized().cross(curve.launch_velocity.normalized())
+	var passed := magnus.x < 0.0
+	_print_result("right half contact with right support curls left", passed)
 	return passed
 
 func _test_support_aim_target_adjusts_aim() -> bool:

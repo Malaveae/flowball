@@ -7,6 +7,7 @@ signal next_spot_requested
 
 @onready var power_label: Label = %PowerLabel
 @onready var power_bar: ProgressBar = %PowerBar
+@onready var power_meter: Control = %PowerMeterPanel
 @onready var support_panel: SupportPlantPanel = %SupportPanel
 @onready var support_marker: Control = %SupportMarker
 @onready var ball_panel: BallContactPanel = %BallContactPanel
@@ -25,6 +26,7 @@ func _ready() -> void:
 func hide_all() -> void:
 	power_label.visible = false
 	power_bar.visible = false
+	power_meter.visible = false
 	support_panel.visible = false
 	ball_panel.visible = false
 	feedback_label.visible = false
@@ -43,13 +45,12 @@ func _support_foot_for_kick(kicking_foot: String) -> String:
 
 func show_power(power_value: float) -> void:
 	power_label.visible = true
-	power_bar.visible = true
+	power_meter.visible = true
 	instruction_label.visible = true
-	instruction_label.text = "Mouse: hold left button to charge power; release to lock. Keyboard: Space."
-	power_label.text = "Power: %d%%" % roundi(power_value * 100.0)
-	power_bar.value = clampf(power_value * 100.0, 0.0, 100.0)
-	_update_power_bar_color(power_value)
-	set_status("State: POWER · charge, then release")
+	instruction_label.text = "STEP 1 — POWER: hold to charge, release to lock. Optimal zone: 70–85%."
+	power_label.text = "POTENCIA ACTUAL: %d%%" % roundi(power_value * 100.0)
+	power_meter.power_value = power_value
+	set_status("State: POWER · charge into the optimal zone, then release")
 
 func show_support_foot_sector(selected_foot: String, _difficulty: FreeKickDifficulty) -> void:
 	hide_all()

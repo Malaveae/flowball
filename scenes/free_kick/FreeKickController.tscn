@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3]
+[gd_scene load_steps=19 format=3]
 
 [ext_resource type="Script" path="res://scripts/state_machine/FreeKickController.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/state_machine/FreeKickStateMachine.gd" id="2"]
@@ -14,6 +14,7 @@
 [ext_resource type="Script" path="res://scripts/telemetry/TrajectoryGhost3D.gd" id="12"]
 [ext_resource type="Script" path="res://scripts/ui/SupportPlantPanel.gd" id="13"]
 [ext_resource type="Script" path="res://scripts/ui/BallContactPanel.gd" id="14"]
+[ext_resource type="Script" path="res://scripts/ui/PowerMeterPanel.gd" id="15"]
 
 [node name="FreeKickController" type="Node"]
 script = ExtResource("1")
@@ -61,6 +62,7 @@ text = "Power: 0%"
 
 [node name="PowerBar" type="ProgressBar" parent="FreeKickUI/Root"]
 unique_name_in_owner = true
+visible = false
 layout_mode = 1
 offset_left = 24.0
 offset_top = 54.0
@@ -69,6 +71,15 @@ offset_bottom = 82.0
 max_value = 100.0
 show_percentage = false
 value = 0.0
+
+[node name="PowerMeterPanel" type="Control" parent="FreeKickUI/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+offset_left = 80.0
+offset_top = 130.0
+offset_right = 1200.0
+offset_bottom = 290.0
+script = ExtResource("15")
 
 [node name="SupportPanel" type="Panel" parent="FreeKickUI/Root"]
 unique_name_in_owner = true

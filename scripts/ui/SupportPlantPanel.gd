@@ -4,9 +4,9 @@ extends Panel
 @export var selected_foot: String = "right"
 @export var sector_radius: float = 160.0
 @export var sector_angle_degrees: float = 120.0
-@export var sector_color: Color = Color(0.2, 0.8, 1.0, 0.18)
-@export var guide_color: Color = Color(0.7, 0.95, 1.0, 0.75)
-@export var text_color: Color = Color(1.0, 1.0, 1.0, 0.95)
+@export var sector_color: Color = Color(0.05, 0.7, 0.95, 0.16)
+@export var guide_color: Color = Color(0.65, 0.95, 1.0, 0.78)
+@export var text_color: Color = Color(0.92, 0.98, 1.0, 0.96)
 
 var marker_local: Vector2 = Vector2.ZERO
 var has_marker: bool = false
@@ -37,71 +37,120 @@ func set_substep_label(text: String) -> void:
 func _draw() -> void:
 	var center := size * 0.5
 	var font := get_theme_default_font()
-	var font_size := 14
-	# White center dot = the ball. Red marker = support/planted foot.
-	# Physical rule: right-foot kick plants the left foot on the left side of the ball; left-foot kick mirrors it.
 	var side_sign := -1.0 if selected_foot == "right" else 1.0
-	var center_angle := 0.0 if side_sign > 0.0 else PI
-	var half_angle := deg_to_rad(sector_angle_degrees * 0.5)
-	var lane_rect := Rect2(center - Vector2(sector_radius, sector_radius), Vector2(sector_radius * 2.0, sector_radius * 2.0))
-	draw_rect(lane_rect, sector_color, true)
-	draw_rect(lane_rect, guide_color, false, 2.0)
+	var support_foot := "LEFT" if selected_foot == "right" else "RIGHT"
+	var active_marker := center + marker_local if has_marker else center + Vector2(side_sign * sector_radius * 0.58, 18.0)
 
-	# Support-foot legal side. Dim the impossible side so the player understands the ball is the center.
+	_draw_backplate(center)
+	_draw_pitch_grid(center)
+	_draw_legal_zone(center, side_sign)
+	_draw_distance_rings(center)
+	_draw_aim_lanes(center)
+	_draw_ball(center)
+	_draw_support_foot(center, active_marker, side_sign)
+	_draw_header(center, support_foot, font)
+	_draw_footer(center, support_foot, font)
+
+func _draw_backplate(center: Vector2) -> void:
+	var panel_rect := Rect2(Vector2.ZERO, size)
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.015, 0.027, 0.03, 0.92)
+	bg.border_color = Color(0.08, 0.72, 0.95, 0.9)
+	bg.border_width_left = 2
+	bg.border_width_top = 2
+	bg.border_width_right = 2
+	bg.border_width_bottom = 2
+	bg.corner_radius_top_left = 18
+	bg.corner_radius_top_right = 18
+	bg.corner_radius_bottom_left = 18
+	bg.corner_radius_bottom_right = 18
+	draw_style_box(bg, panel_rect)
+	draw_circle(center, sector_radius * 1.22, Color(0.0, 0.9, 1.0, 0.035))
+	draw_circle(center, sector_radius * 0.72, Color(0.6, 1.0, 0.2, 0.035))
+
+func _draw_pitch_grid(center: Vector2) -> void:
+	var pitch := Rect2(center - Vector2(sector_radius, sector_radius), Vector2(sector_radius * 2.0, sector_radius * 2.0))
+	draw_rect(pitch, Color(0.03, 0.18, 0.12, 0.58), true)
+	for i in range(0, 9):
+		var x := pitch.position.x + float(i) * pitch.size.x / 8.0
+		draw_line(Vector2(x, pitch.position.y), Vector2(x, pitch.end.y), Color(1, 1, 1, 0.055), 1.0)
+		var y := pitch.position.y + float(i) * pitch.size.y / 8.0
+		draw_line(Vector2(pitch.position.x, y), Vector2(pitch.end.x, y), Color(1, 1, 1, 0.055), 1.0)
+	draw_rect(pitch, Color(0.55, 0.95, 1.0, 0.26), false, 2.0)
+
+func _draw_legal_zone(center: Vector2, side_sign: float) -> void:
 	var legal_rect := Rect2(center + Vector2(0.0 if side_sign > 0.0 else -sector_radius, -sector_radius), Vector2(sector_radius, sector_radius * 2.0))
 	var illegal_rect := Rect2(center + Vector2(-sector_radius if side_sign > 0.0 else 0.0, -sector_radius), Vector2(sector_radius, sector_radius * 2.0))
-	draw_rect(legal_rect, Color(0.2, 0.9, 1.0, 0.16), true)
-	draw_rect(illegal_rect, Color(1.0, 0.12, 0.08, 0.07), true)
-	draw_line(center + Vector2(-sector_radius, 0), center + Vector2(sector_radius, 0), Color(1.0, 1.0, 1.0, 0.45), 2.0)
-	draw_line(center + Vector2(0, -sector_radius), center + Vector2(0, sector_radius), Color(1.0, 0.85, 0.25, 0.45), 1.5)
+	draw_rect(illegal_rect, Color(1.0, 0.06, 0.03, 0.10), true)
+	draw_rect(legal_rect, sector_color, true)
+	draw_line(center + Vector2(-sector_radius, 0), center + Vector2(sector_radius, 0), Color(1, 1, 1, 0.34), 2.0)
+	draw_line(center + Vector2(0, -sector_radius), center + Vector2(0, sector_radius), Color(1.0, 0.86, 0.28, 0.5), 2.0)
 
-	# Minimum useful plant distance.
-	draw_arc(center, sector_radius * 0.35, 0.0, TAU, 64, Color(0.2, 1.0, 0.35, 0.9), 3.0)
+func _draw_distance_rings(center: Vector2) -> void:
+	draw_arc(center, sector_radius * 0.35, 0.0, TAU, 96, Color(0.35, 1.0, 0.28, 0.88), 3.0)
+	draw_arc(center, sector_radius * 0.62, 0.0, TAU, 96, Color(1.0, 0.82, 0.22, 0.36), 1.5)
+	draw_arc(center, sector_radius * 0.86, 0.0, TAU, 96, Color(1.0, 0.18, 0.08, 0.26), 1.5)
 
-	# Substep B guide: subtle support-foot rotation only, clamped to ±30°.
-	var aim_ray_length := sector_radius * 0.8
-	var max_aim_offset := deg_to_rad(30.0)
-	var left_guide := center + Vector2.UP.rotated(-max_aim_offset) * aim_ray_length
-	var center_guide := center + Vector2.UP * aim_ray_length
-	var right_guide := center + Vector2.UP.rotated(max_aim_offset) * aim_ray_length
-	draw_line(center, left_guide, Color(1.0, 1.0, 1.0, 0.28), 2.0)
-	draw_line(center, center_guide, Color(0.35, 0.9, 1.0, 0.45), 2.5)
-	draw_line(center, right_guide, Color(1.0, 1.0, 1.0, 0.28), 2.0)
-	draw_string(font, left_guide + Vector2(-48.0, -10.0), "LEFT -30°", HORIZONTAL_ALIGNMENT_CENTER, 96.0, 11, text_color)
-	draw_string(font, center_guide + Vector2(-44.0, -18.0), "CENTER", HORIZONTAL_ALIGNMENT_CENTER, 88.0, 11, text_color)
-	draw_string(font, right_guide + Vector2(-48.0, -10.0), "RIGHT +30°", HORIZONTAL_ALIGNMENT_CENTER, 96.0, 11, text_color)
+func _draw_aim_lanes(center: Vector2) -> void:
+	var aim_ray_length := sector_radius * 0.86
+	for lane in [-1, 0, 1]:
+		var angle := deg_to_rad(float(lane) * 30.0)
+		var end := center + Vector2.UP.rotated(angle) * aim_ray_length
+		var color := Color(0.35, 0.9, 1.0, 0.62) if lane == 0 else Color(1.0, 1.0, 1.0, 0.28)
+		draw_line(center, end, color, 2.5)
+	var font := get_theme_default_font()
+	draw_string(font, center + Vector2(-154.0, -sector_radius + 16.0), "LEFT POST", HORIZONTAL_ALIGNMENT_CENTER, 96.0, 12, text_color)
+	draw_string(font, center + Vector2(-48.0, -sector_radius - 10.0), "CENTER", HORIZONTAL_ALIGNMENT_CENTER, 96.0, 12, Color(0.55, 0.95, 1.0, 1.0))
+	draw_string(font, center + Vector2(58.0, -sector_radius + 16.0), "RIGHT POST", HORIZONTAL_ALIGNMENT_CENTER, 104.0, 12, text_color)
 
-	# Support-foot vector: a straight line from ball center to plant point.
-	if has_marker:
-		var marker := center + marker_local
-		var line_color := Color(1.0, 0.18, 0.1, 0.95)
-		draw_line(center, marker, line_color, 5.0)
-		draw_circle(marker, 12.0, line_color)
-		draw_circle(marker, 5.0, Color.WHITE)
-		var angle_dir := Vector2.from_angle(foot_angle) if has_foot_angle else (marker_local.normalized() if marker_local.length() > 0.001 else Vector2(side_sign, 0.0))
-		# Foot angle line: second substep rotates this bar around the planted point.
-		draw_line(marker - angle_dir * 24.0, marker + angle_dir * 24.0, Color(1.0, 1.0, 1.0, 0.95), 5.0)
-		if has_foot_angle:
-			var selected_target := marker + angle_dir * 58.0
-			draw_line(marker, selected_target, Color(1.0, 0.9, 0.2, 0.85), 3.0)
-			draw_circle(selected_target, 7.0, Color(1.0, 0.85, 0.2, 0.95))
-			var aim_adjust := aim_target * 6.0
-			var meter_width := 140.0
-			var meter_pos := marker + Vector2(-meter_width * 0.5, 34.0)
-			draw_rect(Rect2(meter_pos, Vector2(meter_width, 8.0)), Color(0.0, 0.0, 0.0, 0.45), true)
-			draw_line(meter_pos + Vector2(meter_width * 0.5, -4.0), meter_pos + Vector2(meter_width * 0.5, 12.0), Color.WHITE, 1.5)
-			var fill_center := meter_pos + Vector2(meter_width * 0.5, 0.0)
-			var fill_end := fill_center + Vector2((aim_adjust / 6.0) * meter_width * 0.5, 0.0)
-			draw_line(fill_center + Vector2(0, 4.0), fill_end + Vector2(0, 4.0), Color(1.0, 0.85, 0.2, 1.0), 7.0)
-			var label := "RIGHT POST" if aim_target > 0.25 else "LEFT POST" if aim_target < -0.25 else "CENTER"
-			draw_string(font, meter_pos + Vector2(0, 26.0), "FOOT TARGET: %s" % label, HORIZONTAL_ALIGNMENT_CENTER, meter_width, 12, Color(1.0, 0.9, 0.35, 1.0))
+func _draw_ball(center: Vector2) -> void:
+	draw_circle(center, 17.0, Color(0.03, 0.035, 0.04, 0.9))
+	draw_circle(center, 13.0, Color.WHITE)
+	draw_circle(center + Vector2(-4, -4), 3.0, Color(0.05, 0.08, 0.1, 0.65))
+	draw_string(get_theme_default_font(), center + Vector2(18.0, -10.0), "BALL", HORIZONTAL_ALIGNMENT_LEFT, 72.0, 12, Color.WHITE)
 
-	draw_string(font, center + Vector2(-160.0, -sector_radius - 56.0), "STEP 2: SUPPORT FOOT SETUP", HORIZONTAL_ALIGNMENT_LEFT, 420.0, 17, Color(1, 1, 1, 1))
-	draw_string(font, center + Vector2(-162.0, -sector_radius - 34.0), substep_label, HORIZONTAL_ALIGNMENT_LEFT, 440.0, 14, Color(1.0, 0.92, 0.3, 1.0))
-	draw_string(font, center + Vector2(-162.0, -sector_radius - 14.0), "A = plant/support foot. B = subtle aim angle to LEFT POST / CENTER / RIGHT POST.", HORIZONTAL_ALIGNMENT_LEFT, 560.0, 13, text_color)
-	var support_foot := "LEFT" if selected_foot == "right" else "RIGHT"
-	var support_label := "%s SUPPORT FOOT ZONE (%s-foot kick)" % [support_foot, selected_foot.to_upper()]
-	draw_string(font, center + Vector2(side_sign * 34.0 - 120.0, -sector_radius + 22.0), support_label, HORIZONTAL_ALIGNMENT_LEFT, 300.0, font_size, text_color)
-	draw_string(font, center + Vector2(-92.0, sector_radius + 18.0), "White dot = ball center. Red dot = planted/support foot.", HORIZONTAL_ALIGNMENT_LEFT, 430.0, 13, Color(1.0, 0.9, 0.45, 0.95))
-	draw_circle(center, 8.0, Color.WHITE)
-	draw_string(font, center + Vector2(10.0, -10.0), "BALL", HORIZONTAL_ALIGNMENT_LEFT, 70.0, 12, Color.WHITE)
+func _draw_support_foot(center: Vector2, marker: Vector2, side_sign: float) -> void:
+	var marker_color := Color(1.0, 0.18, 0.08, 1.0) if has_marker else Color(1.0, 0.5, 0.22, 0.54)
+	draw_dashed_line(center, marker, marker_color, 3.0, 7.0)
+	draw_circle(marker, 19.0, Color(1.0, 0.18, 0.08, 0.22))
+	draw_circle(marker, 12.0, marker_color)
+	draw_circle(marker, 5.0, Color.WHITE)
+	var angle_dir := Vector2.from_angle(foot_angle) if has_foot_angle else Vector2(side_sign, 0.0)
+	_draw_boot(marker, angle_dir, has_marker)
+	if has_foot_angle:
+		_draw_aim_meter(marker, angle_dir)
+
+func _draw_boot(marker: Vector2, dir: Vector2, active: bool) -> void:
+	var side := dir.orthogonal().normalized()
+	var boot := PackedVector2Array([
+		marker + dir * 31.0 + side * 8.0,
+		marker + dir * 22.0 - side * 14.0,
+		marker - dir * 28.0 - side * 10.0,
+		marker - dir * 32.0 + side * 10.0,
+		marker + dir * 12.0 + side * 16.0,
+	])
+	var color := Color(1.0, 1.0, 1.0, 0.96) if active else Color(1.0, 1.0, 1.0, 0.34)
+	draw_colored_polygon(boot, color)
+	draw_polyline(boot, Color(0.0, 0.75, 1.0, 0.85), 2.0, true)
+
+func _draw_aim_meter(marker: Vector2, angle_dir: Vector2) -> void:
+	var target := marker + angle_dir * 62.0
+	draw_line(marker, target, Color(1.0, 0.9, 0.2, 0.92), 3.0)
+	draw_circle(target, 7.0, Color(1.0, 0.85, 0.2, 1.0))
+	var meter_width := 148.0
+	var meter_pos := marker + Vector2(-meter_width * 0.5, 38.0)
+	draw_rect(Rect2(meter_pos, Vector2(meter_width, 10.0)), Color(0.0, 0.0, 0.0, 0.55), true)
+	draw_line(meter_pos + Vector2(meter_width * 0.5, -4.0), meter_pos + Vector2(meter_width * 0.5, 14.0), Color.WHITE, 1.5)
+	var fill_end := meter_pos + Vector2(meter_width * 0.5 + aim_target * meter_width * 0.5, 5.0)
+	draw_line(meter_pos + Vector2(meter_width * 0.5, 5.0), fill_end, Color(1.0, 0.85, 0.2, 1.0), 8.0)
+	var label := "RIGHT POST" if aim_target > 0.25 else "LEFT POST" if aim_target < -0.25 else "CENTER"
+	draw_string(get_theme_default_font(), meter_pos + Vector2(0, 29.0), "TARGET: %s" % label, HORIZONTAL_ALIGNMENT_CENTER, meter_width, 12, Color(1.0, 0.9, 0.35, 1.0))
+
+func _draw_header(center: Vector2, support_foot: String, font: Font) -> void:
+	draw_string(font, center + Vector2(-178.0, -sector_radius - 60.0), "STEP 2  ·  SUPPORT FOOT", HORIZONTAL_ALIGNMENT_LEFT, 420.0, 18, Color(1, 1, 1, 1))
+	draw_string(font, center + Vector2(-178.0, -sector_radius - 36.0), substep_label.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, 440.0, 14, Color(1.0, 0.92, 0.3, 1.0))
+	draw_string(font, center + Vector2(-178.0, -sector_radius - 16.0), "%s foot plants beside the ball, then rotates subtly toward the target lane." % support_foot, HORIZONTAL_ALIGNMENT_LEFT, 540.0, 13, text_color)
+
+func _draw_footer(center: Vector2, support_foot: String, font: Font) -> void:
+	var legal_side := "LEFT" if support_foot == "LEFT" else "RIGHT"
+	draw_string(font, center + Vector2(-174.0, sector_radius + 18.0), "Allowed plant side: %s of ball  ·  Green ring = useful distance  ·  Yellow line = foot aim" % legal_side, HORIZONTAL_ALIGNMENT_LEFT, 600.0, 13, Color(1.0, 0.9, 0.45, 0.96))

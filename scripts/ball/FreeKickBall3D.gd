@@ -9,6 +9,7 @@ signal came_to_rest
 
 var active_shot: ShotParams
 var _rest_time := 0.0
+var _net_capture_active := false
 @onready var aerodynamics: BallAerodynamics3D = get_node_or_null("BallAerodynamics3D")
 
 func _ready() -> void:
@@ -30,6 +31,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 func reset_for_free_kick(position: Vector3 = Vector3(0.0, 0.16, 0.0)) -> void:
 	active_shot = null
 	_rest_time = 0.0
+	_net_capture_active = false
 	freeze = true
 	sleeping = false
 	linear_velocity = Vector3.ZERO
@@ -52,6 +54,7 @@ func _finish_reset_visibility(position: Vector3) -> void:
 func launch(shot_params: ShotParams, kicker: Node3D = null, ignore_seconds: float = 0.2) -> void:
 	active_shot = shot_params
 	_rest_time = 0.0
+	_net_capture_active = false
 	freeze = false
 	sleeping = false
 	linear_velocity = shot_params.launch_velocity
@@ -60,6 +63,21 @@ func launch(shot_params: ShotParams, kicker: Node3D = null, ignore_seconds: floa
 		add_collision_exception_with(kicker)
 		_restore_collision_exception_later(kicker, ignore_seconds)
 	launched.emit(shot_params)
+
+func capture_in_net(stop_delay: float = 0.18) -> void:
+	if _net_capture_active:
+		return
+	_net_capture_active = true
+	await get_tree().create_timer(stop_delay).timeout
+	if not is_inside_tree() or not _net_capture_active:
+		return
+	linear_velocity = Vector3.ZERO
+	angular_velocity = Vector3.ZERO
+	freeze = true
+	sleeping = true
+	if active_shot != null:
+		active_shot = null
+		came_to_rest.emit()
 
 func _restore_collision_exception_later(kicker: Node, seconds: float) -> void:
 	await get_tree().create_timer(seconds).timeout

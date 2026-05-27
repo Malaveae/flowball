@@ -11,6 +11,7 @@ extends Resource
 @export var support_vector: Vector2 = Vector2.ZERO
 @export var plant_depth: float = 0.0
 @export var support_foot_angle: float = 0.0
+@export var support_aim_target: float = 0.0
 @export var stability: float = 1.0
 @export var curve_bias: float = 0.0
 @export var error_cone_degrees: float = 0.0

@@ -12,6 +12,7 @@ var marker_local: Vector2 = Vector2.ZERO
 var has_marker: bool = false
 var foot_angle: float = 0.0
 var has_foot_angle: bool = false
+var aim_target: float = 0.0
 var substep_label: String = "1/2: choose foot location"
 
 func set_foot(foot: String) -> void:
@@ -23,8 +24,9 @@ func set_marker(local_pos: Vector2, active: bool = true) -> void:
 	has_marker = active
 	queue_redraw()
 
-func set_foot_angle(angle: float, active: bool = true) -> void:
+func set_foot_angle(angle: float, active: bool = true, target: float = 0.0) -> void:
 	foot_angle = angle
+	aim_target = clampf(target, -1.0, 1.0)
 	has_foot_angle = active
 	queue_redraw()
 
@@ -56,6 +58,19 @@ func _draw() -> void:
 	# Minimum useful plant distance.
 	draw_arc(center, sector_radius * 0.35, 0.0, TAU, 64, Color(0.2, 1.0, 0.35, 0.9), 3.0)
 
+	# Substep B guide: subtle support-foot rotation only, clamped to ±30°.
+	var aim_ray_length := sector_radius * 0.8
+	var max_aim_offset := deg_to_rad(30.0)
+	var left_guide := center + Vector2.UP.rotated(-max_aim_offset) * aim_ray_length
+	var center_guide := center + Vector2.UP * aim_ray_length
+	var right_guide := center + Vector2.UP.rotated(max_aim_offset) * aim_ray_length
+	draw_line(center, left_guide, Color(1.0, 1.0, 1.0, 0.28), 2.0)
+	draw_line(center, center_guide, Color(0.35, 0.9, 1.0, 0.45), 2.5)
+	draw_line(center, right_guide, Color(1.0, 1.0, 1.0, 0.28), 2.0)
+	draw_string(font, left_guide + Vector2(-48.0, -10.0), "LEFT -30°", HORIZONTAL_ALIGNMENT_CENTER, 96.0, 11, text_color)
+	draw_string(font, center_guide + Vector2(-44.0, -18.0), "CENTER", HORIZONTAL_ALIGNMENT_CENTER, 88.0, 11, text_color)
+	draw_string(font, right_guide + Vector2(-48.0, -10.0), "RIGHT +30°", HORIZONTAL_ALIGNMENT_CENTER, 96.0, 11, text_color)
+
 	# Support-foot vector: a straight line from ball center to plant point.
 	if has_marker:
 		var marker := center + marker_local
@@ -67,8 +82,10 @@ func _draw() -> void:
 		# Foot angle line: second substep rotates this bar around the planted point.
 		draw_line(marker - angle_dir * 24.0, marker + angle_dir * 24.0, Color(1.0, 1.0, 1.0, 0.95), 5.0)
 		if has_foot_angle:
-			draw_line(marker, marker + angle_dir * 48.0, Color(1.0, 0.9, 0.2, 0.9), 3.0)
-			var aim_adjust := cos(foot_angle) * 6.0
+			var selected_target := marker + angle_dir * 58.0
+			draw_line(marker, selected_target, Color(1.0, 0.9, 0.2, 0.85), 3.0)
+			draw_circle(selected_target, 7.0, Color(1.0, 0.85, 0.2, 0.95))
+			var aim_adjust := aim_target * 6.0
 			var meter_width := 140.0
 			var meter_pos := marker + Vector2(-meter_width * 0.5, 34.0)
 			draw_rect(Rect2(meter_pos, Vector2(meter_width, 8.0)), Color(0.0, 0.0, 0.0, 0.45), true)
@@ -76,14 +93,15 @@ func _draw() -> void:
 			var fill_center := meter_pos + Vector2(meter_width * 0.5, 0.0)
 			var fill_end := fill_center + Vector2((aim_adjust / 6.0) * meter_width * 0.5, 0.0)
 			draw_line(fill_center + Vector2(0, 4.0), fill_end + Vector2(0, 4.0), Color(1.0, 0.85, 0.2, 1.0), 7.0)
-			var label := "RIGHT" if aim_adjust > 1.0 else "LEFT" if aim_adjust < -1.0 else "NEUTRAL"
-			draw_string(font, meter_pos + Vector2(0, 26.0), "ANGLE AIM: %s" % label, HORIZONTAL_ALIGNMENT_CENTER, meter_width, 12, Color(1.0, 0.9, 0.35, 1.0))
+			var label := "RIGHT POST" if aim_target > 0.25 else "LEFT POST" if aim_target < -0.25 else "CENTER"
+			draw_string(font, meter_pos + Vector2(0, 26.0), "FOOT TARGET: %s" % label, HORIZONTAL_ALIGNMENT_CENTER, meter_width, 12, Color(1.0, 0.9, 0.35, 1.0))
 
 	draw_string(font, center + Vector2(-160.0, -sector_radius - 56.0), "STEP 2: SUPPORT FOOT SETUP", HORIZONTAL_ALIGNMENT_LEFT, 420.0, 17, Color(1, 1, 1, 1))
 	draw_string(font, center + Vector2(-162.0, -sector_radius - 34.0), substep_label, HORIZONTAL_ALIGNMENT_LEFT, 440.0, 14, Color(1.0, 0.92, 0.3, 1.0))
-	draw_string(font, center + Vector2(-162.0, -sector_radius - 14.0), "A = real plant foot side/distance. B = foot angle/aim.", HORIZONTAL_ALIGNMENT_LEFT, 440.0, 13, text_color)
-	var support_label := "LEFT SUPPORT FOOT ZONE" if selected_foot == "right" else "RIGHT SUPPORT FOOT ZONE"
-	draw_string(font, center + Vector2(side_sign * 34.0 - 92.0, -sector_radius + 22.0), support_label, HORIZONTAL_ALIGNMENT_LEFT, 230.0, font_size, text_color)
+	draw_string(font, center + Vector2(-162.0, -sector_radius - 14.0), "A = plant/support foot. B = subtle aim angle to LEFT POST / CENTER / RIGHT POST.", HORIZONTAL_ALIGNMENT_LEFT, 560.0, 13, text_color)
+	var support_foot := "LEFT" if selected_foot == "right" else "RIGHT"
+	var support_label := "%s SUPPORT FOOT ZONE (%s-foot kick)" % [support_foot, selected_foot.to_upper()]
+	draw_string(font, center + Vector2(side_sign * 34.0 - 120.0, -sector_radius + 22.0), support_label, HORIZONTAL_ALIGNMENT_LEFT, 300.0, font_size, text_color)
 	draw_string(font, center + Vector2(-92.0, sector_radius + 18.0), "White dot = ball center. Red dot = planted/support foot.", HORIZONTAL_ALIGNMENT_LEFT, 430.0, 13, Color(1.0, 0.9, 0.45, 0.95))
 	draw_circle(center, 8.0, Color.WHITE)
 	draw_string(font, center + Vector2(10.0, -10.0), "BALL", HORIZONTAL_ALIGNMENT_LEFT, 70.0, 12, Color.WHITE)

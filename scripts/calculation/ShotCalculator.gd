@@ -20,6 +20,7 @@ static func calculate(
 	params.support_vector = input.support_vector
 	params.plant_depth = clamp(input.plant_depth, -1.0, 1.0)
 	params.support_foot_angle = input.support_foot_angle
+	params.support_aim_target = input.support_aim_target
 	params.contact_point = input.impact_point
 
 	var accuracy := stats.normalized(stats.free_kick_accuracy)
@@ -38,11 +39,11 @@ static func calculate(
 	params.stability = _plant_stability(params.plant_depth)
 	# Step 2 is now pure aiming/body setup. Curl comes from Step 3 contact + swipe.
 	params.curve_bias = 0.0
-	var foot_angle_offset := _support_foot_angle_offset(input.support_foot_angle)
+	var foot_angle_offset := _support_aim_target_offset(input.support_aim_target)
 	# Support foot side is physical placement. It should not aim the shot directly anymore.
 	# Aim is fine-tuned by foot angle; curl/contact comes later in Step 3.
 	params.horizontal_angle = clampf(
-		foot_angle_offset + environment.angle_to_goal,
+		foot_angle_offset,
 		-MAX_HORIZONTAL_OFFSET_DEG,
 		MAX_HORIZONTAL_OFFSET_DEG
 	)
@@ -83,10 +84,13 @@ static func _plant_stability(plant_depth: float) -> float:
 	# Middle plant is most stable; extremes prepare special shots but reduce precision.
 	return clampf(1.0 - absf(plant_depth) * 0.35, 0.55, 1.0)
 
-static func _support_foot_angle_offset(angle: float) -> float:
-	# Step 2 substep B: foot angle fine-tunes horizontal aim.
-	# 0 rad points screen/right; convert mostly from the horizontal component to a small aim correction.
-	return clampf(cos(angle) * 6.0, -6.0, 6.0)
+static func _support_aim_target_offset(target: float) -> float:
+	# Step 2 substep B: the foot points at a target lane, independent of support-foot side.
+	# Input convention: -1 = left post, 0 = center, +1 = right post.
+	# Godot uses -Z as the forward goal direction in this scene. Rotating Vector3(0,0,-1)
+	# around +Y by a positive angle moves it toward world-left (negative X), so gameplay
+	# right must be converted to a negative Y-rotation angle.
+	return -clampf(target, -1.0, 1.0) * 45.0
 
 static func _curve_bias_from_support(support_x: float, selected_foot: String) -> float:
 	var foot_sign := -1.0 if selected_foot == "right" else 1.0
@@ -116,6 +120,9 @@ static func _spin_axis_from_contact_and_swipe(contact: Vector2, swipe: Vector2, 
 	var side_action := absf(contact.x) + absf(swipe.x)
 	var natural_foot_bias := (-0.12 if selected_foot == "right" else 0.12) * clampf(side_action * 2.0, 0.0, 1.0)
 	var raw_side_spin := contact.x * 1.65 + swipe.x * 2.35 + natural_foot_bias
+	# Magnus force uses omega x velocity. With goal direction near -Z, positive omega.y
+	# bends the ball toward world-left. Hitting/swiping the visible right half of the ball
+	# applies that opposite-side spin for a right-foot/left-support setup.
 	var side_spin := _signed_deadzone(raw_side_spin, 0.06)
 	# Lower contact and upward follow-through bias toward backspin/lift; upper contact/downward follow-through biases topspin/drive.
 	var backspin_bias := _signed_deadzone(contact.y - swipe.y * 0.5, 0.08)

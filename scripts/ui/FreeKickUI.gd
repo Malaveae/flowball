@@ -3,6 +3,7 @@ extends CanvasLayer
 
 signal restart_requested
 signal switch_foot_requested
+signal next_spot_requested
 
 @onready var power_label: Label = %PowerLabel
 @onready var power_bar: ProgressBar = %PowerBar
@@ -14,10 +15,12 @@ signal switch_foot_requested
 @onready var status_label: Label = %StatusLabel
 @onready var restart_button: Button = %RestartButton
 @onready var switch_foot_button: Button = %SwitchFootButton
+@onready var next_spot_button: Button = %NextSpotButton
 
 func _ready() -> void:
 	restart_button.pressed.connect(func() -> void: restart_requested.emit())
 	switch_foot_button.pressed.connect(func() -> void: switch_foot_requested.emit())
+	next_spot_button.pressed.connect(func() -> void: next_spot_requested.emit())
 
 func hide_all() -> void:
 	power_label.visible = false
@@ -29,6 +32,14 @@ func hide_all() -> void:
 	status_label.visible = true
 	restart_button.visible = true
 	switch_foot_button.visible = true
+	next_spot_button.visible = true
+
+func set_spot_label(label: String) -> void:
+	if next_spot_button != null:
+		next_spot_button.text = "Spot: %s" % label
+
+func _support_foot_for_kick(kicking_foot: String) -> String:
+	return "left" if kicking_foot == "right" else "right"
 
 func show_power(power_value: float) -> void:
 	power_label.visible = true
@@ -42,6 +53,7 @@ func show_power(power_value: float) -> void:
 
 func show_support_foot_sector(selected_foot: String, _difficulty: FreeKickDifficulty) -> void:
 	hide_all()
+	var support_foot := _support_foot_for_kick(selected_foot)
 	power_label.visible = true
 	support_panel.visible = true
 	support_panel.set_foot(selected_foot)
@@ -51,9 +63,9 @@ func show_support_foot_sector(selected_foot: String, _difficulty: FreeKickDiffic
 	support_marker.position = support_panel.size * 0.5 - support_marker.size * 0.5
 	feedback_label.visible = true
 	instruction_label.visible = true
-	instruction_label.text = "STEP 2 — SUPPORT FOOT: white dot=ball, red dot=plant foot. Right-foot kick plants LEFT; left-foot kick plants RIGHT. Plant location sets body balance; foot angle aims."
-	feedback_label.text = "Plant setup: %s foot" % selected_foot
-	set_status("State: PLANT · foot: %s" % selected_foot)
+	instruction_label.text = "STEP 2 — SUPPORT FOOT: white dot=ball, red dot=plant/support foot. Kicking foot: %s. Plant with the %s foot, then point it subtly toward LEFT POST, CENTER, or RIGHT POST." % [selected_foot.to_upper(), support_foot.to_upper()]
+	feedback_label.text = "Plant setup: %s support foot (%s-foot kick)" % [support_foot, selected_foot]
+	set_status("State: PLANT · support: %s · kicking: %s" % [support_foot, selected_foot])
 
 func update_support_marker(local_pos: Vector2) -> void:
 	support_panel.set_marker(local_pos, true)
@@ -62,13 +74,13 @@ func update_support_marker(local_pos: Vector2) -> void:
 	var plant := "ahead/open" if local_pos.y < -18.0 else "behind/closed" if local_pos.y > 18.0 else "level/balanced"
 	set_status("Substep 1/2: support foot %s · %s · release" % [side, plant])
 
-func update_support_foot_angle(angle: float) -> void:
-	support_panel.set_substep_label("2/2: drag around marker to set foot angle")
-	support_panel.set_foot_angle(angle, true)
-	var aim_adjust := cos(angle) * 6.0
-	var adjust_label := "aim right" if aim_adjust > 1.0 else "aim left" if aim_adjust < -1.0 else "neutral aim"
-	feedback_label.text = "Foot angle: %.0f° · %s · %.1f° correction" % [rad_to_deg(angle), adjust_label, aim_adjust]
-	set_status("Substep 2/2: %s · release to confirm" % adjust_label)
+func update_support_foot_angle(angle: float, aim_target: float = 0.0) -> void:
+	support_panel.set_substep_label("2/2: subtle foot angle · ±30° max")
+	support_panel.set_foot_angle(angle, true, aim_target)
+	var foot_offset := clampf(aim_target, -1.0, 1.0) * 30.0
+	var target_label := "RIGHT POST" if aim_target > 0.25 else "LEFT POST" if aim_target < -0.25 else "CENTER"
+	feedback_label.text = "Support foot: %+.0f° · Target lane: %s" % [foot_offset, target_label]
+	set_status("Substep 2/2: subtle angle to %s · release to confirm" % target_label)
 
 func show_ball_contact_ui() -> void:
 	hide_all()
@@ -146,6 +158,10 @@ func show_feedback(report: Resource) -> void:
 	instruction_label.text = "Feedback shown top-left with cyan ghost trajectory. Right-click/R restarts. Middle-click/F switches foot."
 	if report != null and report.get("summary") != null:
 		feedback_label.text = "SHOT FEEDBACK\n" + String(report.get("summary"))
+		if report.get("support_feedback") != null and String(report.get("support_feedback")) != "":
+			feedback_label.text += "\nSupport foot: %s" % String(report.get("support_feedback"))
+		if report.get("coach_tip") != null and String(report.get("coach_tip")) != "":
+			feedback_label.text += "\nCoach tip: %s" % String(report.get("coach_tip"))
 		if report.get("peak_height") != null:
 			feedback_label.text += "\nPeak %.1fm · flight %.1fs · aim %.1f°" % [float(report.get("peak_height")), float(report.get("total_flight_time")), float(report.get("horizontal_angle"))]
 	else:

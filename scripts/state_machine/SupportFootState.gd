@@ -8,6 +8,7 @@ var touch_elapsed := 0.0
 var touching := false
 var marker_local := Vector2.ZERO
 var foot_angle := 0.0
+var aim_target := 0.0
 var radius := 160.0
 var has_marker := false
 var substep: Substep = Substep.LOCATION
@@ -20,6 +21,7 @@ func enter(_controller: FreeKickController) -> void:
 	has_marker = false
 	substep = Substep.LOCATION
 	foot_angle = 0.0
+	aim_target = 0.0
 	controller.camera_rig.set_mode(&"SUPPORT_TOP_DOWN")
 	controller.ui.show_support_foot_sector(controller.input_data.selected_foot, controller.difficulty)
 
@@ -66,7 +68,7 @@ func _input(event: InputEvent) -> void:
 		touching = false
 		if substep == Substep.LOCATION and has_marker:
 			substep = Substep.ANGLE
-			controller.ui.update_support_foot_angle(foot_angle)
+			controller.ui.update_support_foot_angle(foot_angle, aim_target)
 		elif substep == Substep.ANGLE and has_marker:
 			_commit(false)
 		get_viewport().set_input_as_handled()
@@ -80,16 +82,26 @@ func _update_from_screen(pos: Vector2) -> void:
 		foot_angle = marker_local.angle() if marker_local.length() > 0.001 else 0.0
 		controller.ui.update_support_marker(marker_local)
 	else:
+		# Substep 2: subtle support-foot aiming, not a 360° rotation.
+		# Straight up means CENTER. The foot may rotate only 30° left/right:
+		# -30° = LEFT POST, 0° = CENTER, +30° = RIGHT POST.
 		var angle_vector := local - marker_local
 		if angle_vector.length() > 4.0:
-			foot_angle = angle_vector.angle()
-		controller.ui.update_support_foot_angle(foot_angle)
+			var raw_offset := Vector2.UP.angle_to(angle_vector.normalized())
+			var max_offset := deg_to_rad(30.0)
+			var clamped_offset := clampf(raw_offset, -max_offset, max_offset)
+			foot_angle = Vector2.UP.rotated(clamped_offset).angle()
+			# UI convention: visual right in the support panel is +1/right post.
+			# World rotation sign is handled later by ShotCalculator.
+			aim_target = clampf(clamped_offset / max_offset, -1.0, 1.0)
+		controller.ui.update_support_foot_angle(foot_angle, aim_target)
 
 func _commit(use_default: bool) -> void:
 	if use_default or not has_marker:
 		controller.input_data.support_vector = Vector2.ZERO
 		controller.input_data.plant_depth = 0.0
 		controller.input_data.support_foot_angle = 0.0
+		controller.input_data.support_aim_target = 0.0
 		controller.input_data.used_default_support = true
 		controller.input_data.support_timer_expired = use_default
 	else:
@@ -98,4 +110,5 @@ func _commit(use_default: bool) -> void:
 		controller.input_data.support_vector = support
 		controller.input_data.plant_depth = clampf(support.y, -1.0, 1.0)
 		controller.input_data.support_foot_angle = foot_angle
+		controller.input_data.support_aim_target = aim_target
 	finished.emit(&"BallContactState")

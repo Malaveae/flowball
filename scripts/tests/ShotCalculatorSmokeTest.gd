@@ -8,7 +8,10 @@ func _init() -> void:
 	ok = _test_lower_contact_lifts_ball() and ok
 	ok = _test_center_contact_goes_straighter() and ok
 	ok = _test_side_swipe_adds_strong_curve() and ok
-	ok = _test_support_foot_angle_adjusts_aim() and ok
+	ok = _test_right_half_contact_with_left_support_curls_left() and ok
+	ok = _test_support_aim_target_adjusts_aim() and ok
+	ok = _test_support_aim_target_reaches_goal_side() and ok
+	ok = _test_spot_angle_is_not_double_counted() and ok
 	ok = _test_extended_follow_through_increases_curve() and ok
 	ok = _test_support_location_does_not_directly_aim() and ok
 	ok = _test_support_foot_side_is_physical() and ok
@@ -115,17 +118,56 @@ func _test_side_swipe_adds_strong_curve() -> bool:
 	_print_result("side swipe adds strong curve", passed)
 	return passed
 
-func _test_support_foot_angle_adjusts_aim() -> bool:
+func _test_right_half_contact_with_left_support_curls_left() -> bool:
+	var curve_input := _base_input(0.75)
+	curve_input.selected_foot = "right"
+	curve_input.support_vector = Vector2(-0.45, 0.0)
+	curve_input.impact_point = Vector2(0.55, 0.0)
+	curve_input.swipe_points = PackedVector2Array([Vector2(0.55, 0.0), Vector2(1.2, -0.1)])
+	var curve := ShotCalculator.calculate(curve_input, _stats(), _environment(), _difficulty())
+	var magnus := curve.spin_axis.normalized().cross(curve.launch_velocity.normalized())
+	var passed := magnus.x < 0.0
+	_print_result("right half contact with left support curls left", passed)
+	return passed
+
+func _test_support_aim_target_adjusts_aim() -> bool:
 	var left_angle_input := _base_input(0.75)
 	left_angle_input.support_vector = Vector2.ZERO
-	left_angle_input.support_foot_angle = PI
+	left_angle_input.support_aim_target = -1.0
 	var right_angle_input := _base_input(0.75)
 	right_angle_input.support_vector = Vector2.ZERO
-	right_angle_input.support_foot_angle = 0.0
+	right_angle_input.support_aim_target = 1.0
 	var left_angle := ShotCalculator.calculate(left_angle_input, _stats(), _environment(), _difficulty())
 	var right_angle := ShotCalculator.calculate(right_angle_input, _stats(), _environment(), _difficulty())
-	var passed := right_angle.horizontal_angle > left_angle.horizontal_angle
-	_print_result("support foot angle adjusts aim", passed)
+	var passed := right_angle.horizontal_angle < left_angle.horizontal_angle
+	_print_result("support aim target adjusts aim", passed)
+	return passed
+
+func _test_support_aim_target_reaches_goal_side() -> bool:
+	var left_input := _base_input(0.75)
+	left_input.support_aim_target = -1.0
+	var right_input := _base_input(0.75)
+	right_input.support_aim_target = 1.0
+	var left := ShotCalculator.calculate(left_input, _stats(), _environment(), _difficulty())
+	var right := ShotCalculator.calculate(right_input, _stats(), _environment(), _difficulty())
+	var left_x := _x_at_goal_plane(left.launch_velocity, 24.0)
+	var right_x := _x_at_goal_plane(right.launch_velocity, 24.0)
+	var passed := right_x > left_x and right_x > 0.0 and left_x < 0.0
+	_print_result("support aim target reaches goal side", passed)
+	return passed
+
+func _test_spot_angle_is_not_double_counted() -> bool:
+	var environment := _environment()
+	environment.base_goal_direction = Vector3(-0.3, 0.0, -1.0).normalized()
+	environment.angle_to_goal = rad_to_deg(atan2(environment.base_goal_direction.x, -environment.base_goal_direction.z))
+	var center_input := _base_input(0.75)
+	center_input.support_aim_target = 0.0
+	var right_input := _base_input(0.75)
+	right_input.support_aim_target = 1.0
+	var center := ShotCalculator.calculate(center_input, _stats(), environment, _difficulty())
+	var right := ShotCalculator.calculate(right_input, _stats(), environment, _difficulty())
+	var passed := is_equal_approx(absf(right.horizontal_angle - center.horizontal_angle), 25.0)
+	_print_result("spot angle is not double-counted", passed)
 	return passed
 
 func _test_extended_follow_through_increases_curve() -> bool:
@@ -162,6 +204,10 @@ func _test_support_foot_side_is_physical() -> bool:
 	var passed := right_kick_marker.x < 0.0 and left_kick_marker.x > 0.0
 	_print_result("support foot side is physical", passed)
 	return passed
+
+func _x_at_goal_plane(velocity: Vector3, goal_distance: float) -> float:
+	var time_to_goal := -goal_distance / velocity.z
+	return velocity.x * time_to_goal
 
 func _print_result(label: String, passed: bool) -> void:
 	if passed:

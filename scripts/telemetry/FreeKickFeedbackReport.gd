@@ -10,5 +10,7 @@ extends Resource
 @export var curl_strength: StringName = &"low"
 @export var elevation_angle: float = 0.0
 @export var horizontal_angle: float = 0.0
+@export var support_feedback: String = ""
+@export var coach_tip: String = ""
 @export var peak_height: float = 0.0
 @export var total_flight_time: float = 0.0

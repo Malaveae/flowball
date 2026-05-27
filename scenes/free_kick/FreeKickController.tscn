@@ -145,6 +145,15 @@ offset_right = 348.0
 offset_bottom = 628.0
 text = "Switch Foot"
 
+[node name="NextSpotButton" type="Button" parent="FreeKickUI/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+offset_left = 360.0
+offset_top = 590.0
+offset_right = 560.0
+offset_bottom = 628.0
+text = "Spot: Center 24m"
+
 [node name="FreeKickCameraRig" type="Node3D" parent="."]
 script = ExtResource("10")
 camera_path = NodePath("../../Camera3D")

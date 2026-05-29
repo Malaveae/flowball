@@ -2,6 +2,7 @@ class_name ExecuteShotState
 extends FreeKickState
 
 @export var fallback_contact_delay: float = 0.25
+@export var max_shot_duration: float = 7.0
 
 var _run_id: int = -1
 var _launched_ball: FreeKickBall3D
@@ -23,6 +24,7 @@ func enter(_controller: FreeKickController) -> void:
 		ball.launch(controller.shot_params, controller.get_kicker())
 		if not ball.came_to_rest.is_connected(_on_ball_done):
 			ball.came_to_rest.connect(_on_ball_done, CONNECT_ONE_SHOT)
+		_force_feedback_after_timeout(_run_id)
 	else:
 		_on_ball_done()
 
@@ -32,10 +34,19 @@ func exit() -> void:
 	_launched_ball = null
 	super.exit()
 
+func _force_feedback_after_timeout(shot_run_id: int) -> void:
+	await get_tree().create_timer(max_shot_duration).timeout
+	if controller == null or controller.run_id != shot_run_id or controller.state_machine.current_state != self:
+		return
+	_finish_shot(&"timeout")
+
 func _on_ball_done() -> void:
+	_finish_shot(&"landed")
+
+func _finish_shot(outcome: StringName) -> void:
 	# Ignore stale rest signals from a previous shot after the user restarted the loop.
 	if controller.state_machine.current_state != self or controller.run_id != _run_id:
 		return
 	if controller.shot_observer != null:
-		controller.shot_observer.stop_recording(&"landed")
+		controller.shot_observer.stop_recording(outcome)
 	finished.emit(&"FeedbackState")

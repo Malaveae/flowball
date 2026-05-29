@@ -55,6 +55,8 @@ func start_free_kick(selected_foot: String = "right") -> void:
 	run_id += 1
 	input_data = FreeKickInputData.new()
 	input_data.selected_foot = selected_foot
+	if ui != null:
+		ui.set_kicking_foot(selected_foot)
 	shot_params = null
 	if trajectory_ghost != null:
 		trajectory_ghost.clear()
@@ -73,8 +75,15 @@ func get_ball() -> FreeKickBall3D:
 func get_kicker() -> Node3D:
 	return get_node_or_null(kicker_path) as Node3D
 
+func restart_attempt() -> void:
+	var sandbox := get_parent()
+	if sandbox != null and sandbox.has_method("start_new_attempt"):
+		sandbox.call("start_new_attempt", input_data.selected_foot)
+	else:
+		start_free_kick(input_data.selected_foot)
+
 func _on_restart_requested() -> void:
-	start_free_kick(input_data.selected_foot)
+	restart_attempt()
 
 func _on_switch_foot_requested() -> void:
 	var next_foot := "left" if input_data.selected_foot == "right" else "right"

@@ -45,6 +45,8 @@ func _apply_camera_transform(camera: Camera3D, target: Transform3D, target_fov: 
 func _transform_for_mode(next_mode: StringName) -> Transform3D:
 	if next_mode == &"BALL_CONTACT_UI":
 		return _ball_contact_transform()
+	if next_mode == &"SUPPORT_TOP_DOWN":
+		return _support_top_down_transform()
 	return _goal_centered_transform(next_mode)
 
 func _goal_centered_transform(next_mode: StringName) -> Transform3D:
@@ -88,6 +90,12 @@ func _goal_centered_transform(next_mode: StringName) -> Transform3D:
 	var target := goal.lerp(ball, 0.18) + Vector3.UP * look_height
 	return Transform3D(Basis.looking_at((target - origin).normalized(), Vector3.UP), origin)
 
+func _support_top_down_transform() -> Transform3D:
+	# Step 2 uses the real ball from a zenith camera instead of a 2D overlay panel.
+	var ball := _target_position()
+	var origin := ball + Vector3.UP * 5.2
+	return Transform3D(Basis.looking_at(Vector3.DOWN, Vector3.FORWARD), origin)
+
 func _ball_contact_transform() -> Transform3D:
 	# Contact mode intentionally centers the real foreground ball for touch input, not the goal.
 	var ball := _target_position()
@@ -106,7 +114,7 @@ func _fov_for_mode(next_mode: StringName) -> float:
 		&"SHOT_FOLLOW", &"FEEDBACK_REPLAY":
 			return shot_follow_fov
 		&"SUPPORT_TOP_DOWN":
-			return default_fov + 8.0
+			return 32.0
 		_:
 			return default_fov
 

@@ -1,4 +1,4 @@
-[gd_scene load_steps=25 format=3]
+[gd_scene load_steps=31 format=3]
 
 [ext_resource type="Script" path="res://scripts/state_machine/FreeKickSandbox.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/free_kick/Ball3D.tscn" id="2"]
@@ -39,6 +39,29 @@ bounce = 0.18
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_net"]
 friction = 0.95
 bounce = 0.02
+
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_stand"]
+friction = 0.55
+bounce = 0.42
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_stand_concrete"]
+albedo_color = Color(0.18, 0.2, 0.22, 1)
+roughness = 0.82
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_stand_seats"]
+albedo_color = Color(0.05, 0.32, 0.5, 1)
+roughness = 0.7
+
+[sub_resource type="BoxMesh" id="BoxMesh_stand_backstop"]
+material = SubResource("StandardMaterial3D_stand_concrete")
+size = Vector3(42, 5, 0.35)
+
+[sub_resource type="BoxShape3D" id="BoxShape_stand_backstop"]
+size = Vector3(42, 5, 0.35)
+
+[sub_resource type="BoxMesh" id="BoxMesh_stand_seat_row"]
+material = SubResource("StandardMaterial3D_stand_seats")
+size = Vector3(40, 0.28, 0.55)
 
 [sub_resource type="BoxShape3D" id="BoxShape_goal_post"]
 size = Vector3(0.16, 2.55, 0.16)
@@ -150,6 +173,29 @@ shape = SubResource("BoxShape_net_side")
 [node name="RoofNetCollision" type="CollisionShape3D" parent="GoalNetCollision"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, -24.68)
 shape = SubResource("BoxShape_net_roof")
+
+[node name="GoalStandBackstop" type="StaticBody3D" parent="."]
+physics_material_override = SubResource("PhysicsMaterial_stand")
+
+[node name="BackstopMesh" type="MeshInstance3D" parent="GoalStandBackstop"]
+transform = Transform3D(1, 0, 0, 0, 0.966, -0.259, 0, 0.259, 0.966, 0, 2.6, -28.4)
+mesh = SubResource("BoxMesh_stand_backstop")
+
+[node name="BackstopCollision" type="CollisionShape3D" parent="GoalStandBackstop"]
+transform = Transform3D(1, 0, 0, 0, 0.966, -0.259, 0, 0.259, 0.966, 0, 2.6, -28.4)
+shape = SubResource("BoxShape_stand_backstop")
+
+[node name="SeatRow1" type="MeshInstance3D" parent="GoalStandBackstop"]
+transform = Transform3D(1, 0, 0, 0, 0.966, -0.259, 0, 0.259, 0.966, 0, 0.65, -27.05)
+mesh = SubResource("BoxMesh_stand_seat_row")
+
+[node name="SeatRow2" type="MeshInstance3D" parent="GoalStandBackstop"]
+transform = Transform3D(1, 0, 0, 0, 0.966, -0.259, 0, 0.259, 0.966, 0, 1.15, -27.45)
+mesh = SubResource("BoxMesh_stand_seat_row")
+
+[node name="SeatRow3" type="MeshInstance3D" parent="GoalStandBackstop"]
+transform = Transform3D(1, 0, 0, 0, 0.966, -0.259, 0, 0.259, 0.966, 0, 1.65, -27.85)
+mesh = SubResource("BoxMesh_stand_seat_row")
 
 [node name="Player3D" type="CharacterBody3D" parent="."]
 visible = false

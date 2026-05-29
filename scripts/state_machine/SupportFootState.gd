@@ -24,11 +24,13 @@ func enter(_controller: FreeKickController) -> void:
 	aim_target = 0.0
 	controller.camera_rig.set_mode(&"SUPPORT_TOP_DOWN")
 	controller.ui.show_support_foot_sector(controller.input_data.selected_foot, controller.difficulty)
+	controller.ui.update_support_marker(Vector2(-radius * 0.55 if controller.input_data.selected_foot == "right" else radius * 0.55, 0.0))
 
 func _process(delta: float) -> void:
 	elapsed += delta
 	var step_text := "1/2 LOCATION — release to lock" if substep == Substep.LOCATION else "2/2 FOOT ANGLE — release to continue"
 	controller.ui.set_status("State: PLANT %s · %.1fs" % [step_text, maxf(0.0, controller.difficulty.step2_time_limit - elapsed)])
+	_align_world_marker()
 	if touching:
 		touch_elapsed += delta
 	elif elapsed >= controller.difficulty.step2_time_limit:
@@ -74,8 +76,7 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _update_from_screen(pos: Vector2) -> void:
-	var support_control := controller.ui.get_support_control()
-	var local := FreeKickInputMapper.screen_to_control_local(pos, support_control)
+	var local := _screen_to_ball_local(pos)
 	if substep == Substep.LOCATION:
 		marker_local = FreeKickInputMapper.clamp_to_support_foot_side(local, radius, controller.input_data.selected_foot)
 		has_marker = true
@@ -95,6 +96,31 @@ func _update_from_screen(pos: Vector2) -> void:
 			# World rotation sign is handled later by ShotCalculator.
 			aim_target = clampf(clamped_offset / max_offset, -1.0, 1.0)
 		controller.ui.update_support_foot_angle(foot_angle, aim_target)
+
+func _align_world_marker() -> void:
+	var ball := controller.get_ball()
+	var camera := controller.camera_rig.get_camera()
+	if ball == null or camera == null:
+		return
+	var world_offset := Vector2.ZERO
+	if has_marker:
+		world_offset = marker_local / radius
+	controller.ui.align_support_marker_hint(ball, camera, controller.input_data.selected_foot, world_offset)
+
+func _screen_to_ball_local(screen_pos: Vector2) -> Vector2:
+	var ball := controller.get_ball()
+	var camera := controller.camera_rig.get_camera()
+	if ball == null or camera == null:
+		return Vector2.ZERO
+	var center := camera.unproject_position(ball.global_position)
+	var camera_right := camera.global_transform.basis.x.normalized()
+	var camera_forward := -camera.global_transform.basis.z.normalized()
+	var right_edge := camera.unproject_position(ball.global_position + camera_right * 0.75)
+	var forward_edge := camera.unproject_position(ball.global_position + camera_forward.slide(Vector3.UP).normalized() * 0.75)
+	var px_per_meter := maxf(1.0, maxf(absf(right_edge.x - center.x), absf(forward_edge.y - center.y)))
+	var pixels := screen_pos - center
+	var meters := pixels / px_per_meter
+	return meters * radius
 
 func _commit(use_default: bool) -> void:
 	if use_default or not has_marker:

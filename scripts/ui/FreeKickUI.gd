@@ -14,11 +14,25 @@ signal next_spot_requested
 @onready var feedback_label: Label = %FeedbackLabel
 @onready var instruction_label: Label = %InstructionLabel
 @onready var status_label: Label = %StatusLabel
+@onready var score_label: Label = _create_score_label()
 @onready var restart_button: Button = %RestartButton
 @onready var switch_foot_button: Button = %SwitchFootButton
 @onready var next_spot_button: Button = %NextSpotButton
 
+var kicking_foot := "right"
+var support_marker_hint: Control
+var support_zone_overlay: Control
+var support_zone_center := Vector2(640.0, 360.0)
+var support_zone_radius := 150.0
+var support_zone_marker_local := Vector2.ZERO
+var support_zone_has_marker := false
+var support_zone_aim_target := 0.0
+var support_zone_show_angle := false
+
 func _ready() -> void:
+	support_zone_overlay = _create_support_zone_overlay()
+	support_marker_hint = _create_support_marker_hint()
+	_apply_mvp_layout()
 	restart_button.pressed.connect(func() -> void: restart_requested.emit())
 	switch_foot_button.pressed.connect(func() -> void: switch_foot_requested.emit())
 	next_spot_button.pressed.connect(func() -> void: next_spot_requested.emit())
@@ -32,56 +46,172 @@ func hide_all() -> void:
 	feedback_label.visible = false
 	instruction_label.visible = true
 	status_label.visible = true
-	restart_button.visible = true
+	restart_button.visible = false
 	switch_foot_button.visible = true
-	next_spot_button.visible = true
+	next_spot_button.visible = false
+	feedback_label.remove_theme_stylebox_override("normal")
+	if support_marker_hint != null:
+		support_marker_hint.visible = false
+	if support_zone_overlay != null:
+		support_zone_overlay.visible = false
 
 func set_spot_label(label: String) -> void:
 	if next_spot_button != null:
 		next_spot_button.text = "Spot: %s" % label
 
+func set_scoreboard(text: String) -> void:
+	if score_label != null:
+		score_label.text = text
+
+func _create_support_zone_overlay() -> Control:
+	var root := get_node_or_null("Root") as Control
+	var overlay := Control.new()
+	overlay.name = "SupportZoneOverlay"
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.visible = false
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.draw.connect(func() -> void:
+		var center := support_zone_center
+		var radius := support_zone_radius
+		var legal_side := -1.0 if kicking_foot == "right" else 1.0
+		var legal_rect := Rect2(center + Vector2(-radius if legal_side < 0.0 else 0.0, -radius), Vector2(radius, radius * 2.0))
+		var blocked_rect := Rect2(center + Vector2(0.0 if legal_side < 0.0 else -radius, -radius), Vector2(radius, radius * 2.0))
+		overlay.draw_rect(blocked_rect, Color(1.0, 0.08, 0.04, 0.06), true)
+		overlay.draw_rect(legal_rect, Color(0.2, 1.0, 0.45, 0.08), true)
+		overlay.draw_arc(center, radius * 0.38, 0.0, TAU, 72, Color(0.3, 1.0, 0.35, 0.72), 2.0)
+		overlay.draw_arc(center, radius * 0.68, 0.0, TAU, 72, Color(1.0, 0.85, 0.25, 0.36), 1.4)
+		overlay.draw_line(center + Vector2(-radius, 0.0), center + Vector2(radius, 0.0), Color(1, 1, 1, 0.18), 1.0)
+		overlay.draw_line(center + Vector2(0.0, -radius), center + Vector2(0.0, radius), Color(1, 1, 1, 0.14), 1.0)
+		for lane in [-1, 0, 1]:
+			var angle := deg_to_rad(float(lane) * 30.0)
+			var end := center + Vector2.UP.rotated(angle) * radius * 0.92
+			var color := Color(0.85, 0.9, 1.0, 0.24) if lane != 0 else Color(0.35, 0.9, 1.0, 0.58)
+			overlay.draw_line(center, end, color, 2.0)
+		if support_zone_has_marker:
+			var marker := _support_marker_screen_position()
+			overlay.draw_dashed_line(center, marker, Color(0.4, 1.0, 0.45, 0.7), 2.0, 6.0)
+			overlay.draw_circle(marker, 14.0, Color(0.25, 1.0, 0.35, 0.24))
+			overlay.draw_circle(marker, 6.0, Color(0.4, 1.0, 0.45, 0.95))
+			if support_zone_show_angle:
+				var aim_angle := deg_to_rad(support_zone_aim_target * 30.0)
+				var aim_end := marker + Vector2.UP.rotated(aim_angle) * 62.0
+				overlay.draw_line(marker, aim_end, Color(1.0, 0.86, 0.22, 0.95), 3.0)
+				overlay.draw_circle(aim_end, 5.0, Color(1.0, 0.86, 0.22, 1.0))
+		var side_text := "LEFT" if kicking_foot == "right" else "RIGHT"
+		overlay.draw_string(overlay.get_theme_default_font(), center + Vector2(-96.0, radius + 28.0), "Plant zone: %s side · drag then aim" % side_text, HORIZONTAL_ALIGNMENT_CENTER, 192.0, 13, Color(1, 1, 1, 0.7))
+	)
+	if root != null:
+		root.add_child(overlay)
+	else:
+		add_child(overlay)
+	return overlay
+
+func _create_support_marker_hint() -> Control:
+	var root := get_node_or_null("Root") as Control
+	var marker := Control.new()
+	marker.name = "SupportMarkerHint"
+	marker.size = Vector2(96.0, 96.0)
+	marker.visible = false
+	marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	marker.draw.connect(func() -> void:
+		var center := marker.size * 0.5
+		var legal_color := Color(0.35, 1.0, 0.4, 0.88)
+		var ghost_color := Color(1.0, 1.0, 1.0, 0.2)
+		marker.draw_arc(center, 34.0, 0.0, TAU, 48, legal_color, 2.0)
+		marker.draw_circle(center, 7.0, legal_color)
+		marker.draw_line(center + Vector2(-22.0, 0.0), center + Vector2(22.0, 0.0), ghost_color, 1.0)
+		marker.draw_line(center + Vector2(0.0, -22.0), center + Vector2(0.0, 22.0), ghost_color, 1.0)
+		var label := "PLANT"
+		marker.draw_string(marker.get_theme_default_font(), Vector2(0.0, 88.0), label, HORIZONTAL_ALIGNMENT_CENTER, marker.size.x, 10, Color(1, 1, 1, 0.72))
+	)
+	if root != null:
+		root.add_child(marker)
+	else:
+		add_child(marker)
+	return marker
+
+func _create_score_label() -> Label:
+	var root := get_node_or_null("Root") as Control
+	var label := Label.new()
+	label.name = "ScoreLabel"
+	label.position = Vector2(760.0, 20.0)
+	label.size = Vector2(420.0, 70.0)
+	label.text = "SPOT 1/7  ·  GOALS 0  ·  ATTEMPTS 0\nCenter 24m  ·  THIS SPOT 0"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_font_size_override("font_size", 13)
+	label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.66))
+	if root != null:
+		root.add_child(label)
+	else:
+		add_child(label)
+	return label
+
+func set_kicking_foot(foot: String) -> void:
+	kicking_foot = foot
+	_position_power_meter_for_foot()
+
 func _support_foot_for_kick(kicking_foot: String) -> String:
 	return "left" if kicking_foot == "right" else "right"
 
 func show_power(power_value: float) -> void:
+	_position_power_meter_for_foot()
 	power_label.visible = true
 	power_meter.visible = true
 	instruction_label.visible = true
-	instruction_label.text = "STEP 1 — POWER: hold to charge, release to lock. Optimal zone: 70–85%."
-	power_label.text = "POTENCIA ACTUAL: %d%%" % roundi(power_value * 100.0)
+	instruction_label.text = "Hold · release at 70–85%"
+	power_label.text = "%d%%" % roundi(power_value * 100.0)
 	power_meter.power_value = power_value
-	set_status("State: POWER · charge into the optimal zone, then release")
+	set_status("POWER · charge into the optimal zone, then release")
 
 func show_support_foot_sector(selected_foot: String, _difficulty: FreeKickDifficulty) -> void:
 	hide_all()
 	var support_foot := _support_foot_for_kick(selected_foot)
-	power_label.visible = true
-	support_panel.visible = true
-	support_panel.set_foot(selected_foot)
-	support_panel.set_marker(Vector2.ZERO, false)
-	support_panel.set_foot_angle(0.0, false)
-	support_panel.set_substep_label("1/2: drag to set support-foot location")
-	support_marker.position = support_panel.size * 0.5 - support_marker.size * 0.5
+	power_label.visible = false
+	power_meter.visible = false
+	support_panel.visible = false
+	support_marker.visible = false
+	if support_zone_overlay != null:
+		support_zone_overlay.visible = true
+		support_zone_has_marker = false
+		support_zone_show_angle = false
+		support_zone_overlay.queue_redraw()
 	feedback_label.visible = true
 	instruction_label.visible = true
-	instruction_label.text = "STEP 2 — SUPPORT FOOT: white dot=ball, red dot=plant/support foot. Kicking foot: %s. Plant with the %s foot, then point it subtly toward LEFT POST, CENTER, or RIGHT POST." % [selected_foot.to_upper(), support_foot.to_upper()]
-	feedback_label.text = "Plant setup: %s support foot (%s-foot kick)" % [support_foot, selected_foot]
-	set_status("State: PLANT · support: %s · kicking: %s" % [support_foot, selected_foot])
+	instruction_label.text = "Zenith view · place %s foot beside the real ball" % support_foot
+	feedback_label.text = "Plant foot"
+	set_status("PLANT · support: %s · kicking: %s" % [support_foot, selected_foot])
 
 func update_support_marker(local_pos: Vector2) -> void:
-	support_panel.set_marker(local_pos, true)
-	support_marker.position = support_panel.size * 0.5 + local_pos - support_marker.size * 0.5
+	if support_panel.visible:
+		support_panel.set_marker(local_pos, true)
+		support_marker.position = support_panel.size * 0.5 + local_pos - support_marker.size * 0.5
+	support_zone_marker_local = local_pos
+	support_zone_has_marker = true
+	support_zone_show_angle = false
+	if support_zone_overlay != null:
+		support_zone_overlay.queue_redraw()
+	if support_marker_hint != null:
+		support_marker_hint.visible = true
+		support_marker_hint.position = _support_hint_position(local_pos) - support_marker_hint.size * 0.5
+		support_marker_hint.queue_redraw()
 	var side := "LEFT of ball" if local_pos.x < 0.0 else "RIGHT of ball"
 	var plant := "ahead/open" if local_pos.y < -18.0 else "behind/closed" if local_pos.y > 18.0 else "level/balanced"
-	set_status("Substep 1/2: support foot %s · %s · release" % [side, plant])
+	feedback_label.text = "Plant: %s · %s" % [side, plant]
+	set_status("Plant %s · %s · release" % [side, plant])
 
 func update_support_foot_angle(angle: float, aim_target: float = 0.0) -> void:
-	support_panel.set_substep_label("2/2: subtle foot angle · ±30° max")
-	support_panel.set_foot_angle(angle, true, aim_target)
-	var foot_offset := clampf(aim_target, -1.0, 1.0) * 30.0
+	if support_panel.visible:
+		support_panel.set_substep_label("2/2: subtle foot angle · ±30° max")
+		support_panel.set_foot_angle(angle, true, aim_target)
+	support_zone_aim_target = clampf(aim_target, -1.0, 1.0)
+	support_zone_show_angle = true
+	if support_zone_overlay != null:
+		support_zone_overlay.queue_redraw()
+	var foot_offset := support_zone_aim_target * 30.0
 	var target_label := "RIGHT POST" if aim_target > 0.25 else "LEFT POST" if aim_target < -0.25 else "CENTER"
-	feedback_label.text = "Support foot: %+.0f° · Target lane: %s" % [foot_offset, target_label]
-	set_status("Substep 2/2: subtle angle to %s · release to confirm" % target_label)
+	feedback_label.text = "Aim: %s · foot %+.0f°" % [target_label, foot_offset]
+	set_status("Angle to %s · release" % target_label)
 
 func show_ball_contact_ui() -> void:
 	hide_all()
@@ -91,9 +221,9 @@ func show_ball_contact_ui() -> void:
 	ball_panel.clear_swipe()
 	feedback_label.visible = true
 	instruction_label.visible = true
-	instruction_label.text = "STEP 3 — POINT + DRAG: press on the ball, then drag beyond it for follow-through. Longer sideways drag = stronger curl; lower start = lift; center+straight = clean power."
-	feedback_label.text = "Ball contact: choose impact point and swipe"
-	set_status("State: CONTACT · foreground ball touch")
+	instruction_label.text = "Touch · drag through ball"
+	feedback_label.text = "Ball contact"
+	set_status("CONTACT · foreground ball touch")
 
 func update_ball_contact(points: PackedVector2Array) -> void:
 	ball_panel.set_swipe_points(points)
@@ -120,6 +250,29 @@ func _ball_contact_status(points: PackedVector2Array) -> String:
 	var follow := (points[points.size() - 1] - points[0]) / maxf(1.0, ball_panel.ball_radius_px)
 	return "Step 3: sideways %.0f%% · length %.0f%% · release to shoot" % [absf(follow.x) * 100.0, follow.length() * 100.0]
 
+func align_support_marker_hint(ball: Node3D, camera: Camera3D, selected_foot: String, world_offset: Vector2 = Vector2.ZERO) -> void:
+	if ball == null or camera == null:
+		return
+	kicking_foot = selected_foot
+	support_zone_center = camera.unproject_position(ball.global_position)
+	var camera_right := camera.global_transform.basis.x.normalized()
+	var radius_edge := camera.unproject_position(ball.global_position + camera_right * 1.05)
+	support_zone_radius = clampf(absf(radius_edge.x - support_zone_center.x), 95.0, 190.0)
+	if support_zone_has_marker:
+		support_zone_marker_local = world_offset * support_zone_radius
+	if support_zone_overlay != null and support_zone_overlay.visible:
+		support_zone_overlay.queue_redraw()
+	if support_marker_hint == null or not support_marker_hint.visible:
+		return
+	support_marker_hint.position = _support_marker_screen_position() - support_marker_hint.size * 0.5
+	support_marker_hint.queue_redraw()
+
+func _support_marker_screen_position() -> Vector2:
+	return support_zone_center + support_zone_marker_local
+
+func _support_hint_position(local_pos: Vector2) -> Vector2:
+	return support_zone_center + local_pos
+
 func align_ball_contact_overlay(ball: Node3D, camera: Camera3D, world_radius: float = 0.11) -> void:
 	if ball == null or camera == null or not ball_panel.visible:
 		return
@@ -133,44 +286,99 @@ func align_ball_contact_overlay(ball: Node3D, camera: Camera3D, world_radius: fl
 	ball_panel.ball_radius_px = screen_radius
 	ball_panel.queue_redraw()
 
-func show_feedback(report: Resource) -> void:
+func show_feedback(report: Resource, auto_restart_delay_seconds: float = 4.0) -> void:
 	hide_all()
 	feedback_label.visible = true
-	feedback_label.position = Vector2(24.0, 96.0)
-	feedback_label.size = Vector2(1156.0, 134.0)
-	feedback_label.add_theme_font_size_override("font_size", 22)
-	var feedback_bg := StyleBoxFlat.new()
-	feedback_bg.bg_color = Color(0.02, 0.025, 0.035, 0.82)
-	feedback_bg.border_color = Color(0.15, 0.85, 1.0, 0.95)
-	feedback_bg.border_width_left = 3
-	feedback_bg.border_width_top = 3
-	feedback_bg.border_width_right = 3
-	feedback_bg.border_width_bottom = 3
-	feedback_bg.corner_radius_top_left = 10
-	feedback_bg.corner_radius_top_right = 10
-	feedback_bg.corner_radius_bottom_left = 10
-	feedback_bg.corner_radius_bottom_right = 10
-	feedback_bg.content_margin_left = 14
-	feedback_bg.content_margin_top = 10
-	feedback_bg.content_margin_right = 14
-	feedback_bg.content_margin_bottom = 10
-	feedback_label.add_theme_stylebox_override("normal", feedback_bg)
+	feedback_label.position = Vector2(24.0, 370.0)
+	feedback_label.size = Vector2(680.0, 150.0)
+	feedback_label.add_theme_font_size_override("font_size", 16)
+	feedback_label.add_theme_stylebox_override("normal", _make_panel_style(Color(0.0, 0.0, 0.0, 0.34), Color(1.0, 1.0, 1.0, 0.14), 1, 6))
 	instruction_label.visible = true
-	instruction_label.text = "Feedback shown top-left with cyan ghost trajectory. Right-click/R restarts. Middle-click/F switches foot."
+	instruction_label.text = "Auto restart in %.0fs" % auto_restart_delay_seconds
 	if report != null and report.get("summary") != null:
-		feedback_label.text = "SHOT FEEDBACK\n" + String(report.get("summary"))
+		feedback_label.text = String(report.get("summary"))
 		if report.get("support_feedback") != null and String(report.get("support_feedback")) != "":
-			feedback_label.text += "\nSupport foot: %s" % String(report.get("support_feedback"))
+			feedback_label.text += "\nPlant: %s" % String(report.get("support_feedback"))
 		if report.get("coach_tip") != null and String(report.get("coach_tip")) != "":
-			feedback_label.text += "\nCoach tip: %s" % String(report.get("coach_tip"))
+			feedback_label.text += "\nTip: %s" % String(report.get("coach_tip"))
 		if report.get("peak_height") != null:
 			feedback_label.text += "\nPeak %.1fm · flight %.1fs · aim %.1f°" % [float(report.get("peak_height")), float(report.get("total_flight_time")), float(report.get("horizontal_angle"))]
 	else:
-		feedback_label.text = "SHOT FEEDBACK\nShot complete"
-	set_status("State: FEEDBACK — read top-left shot feedback")
+		feedback_label.text = "Shot complete"
+	set_status("Auto restart")
 
 func set_status(text: String) -> void:
 	status_label.text = text
+
+func _apply_mvp_layout() -> void:
+	var root := get_node_or_null("Root") as Control
+	if root != null:
+		root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	power_label.position = Vector2(24.0, 20.0)
+	power_label.size = Vector2(110.0, 38.0)
+	power_label.add_theme_font_size_override("font_size", 26)
+	power_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.9))
+	power_bar.visible = false
+	power_bar.position = Vector2(24.0, 64.0)
+	power_bar.size = Vector2(260.0, 6.0)
+	power_meter.size = Vector2(74.0, 320.0)
+	_position_power_meter_for_foot()
+	feedback_label.position = Vector2(24.0, 304.0)
+	feedback_label.size = Vector2(430.0, 58.0)
+	feedback_label.add_theme_font_size_override("font_size", 15)
+	feedback_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.82))
+	instruction_label.position = Vector2(24.0, 676.0)
+	instruction_label.size = Vector2(760.0, 28.0)
+	instruction_label.add_theme_font_size_override("font_size", 16)
+	instruction_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.72))
+	instruction_label.remove_theme_stylebox_override("normal")
+	status_label.position = Vector2(24.0, 642.0)
+	status_label.size = Vector2(520.0, 24.0)
+	status_label.add_theme_font_size_override("font_size", 13)
+	status_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.42))
+	status_label.remove_theme_stylebox_override("normal")
+	_style_button(restart_button, Vector2(24.0, 586.0), Vector2(158.0, 40.0), "Restart  R")
+	restart_button.visible = false
+	_style_button(switch_foot_button, Vector2(24.0, 594.0), Vector2(128.0, 32.0), "Foot  F")
+	switch_foot_button.visible = true
+	_style_button(next_spot_button, Vector2(214.0, 586.0), Vector2(196.0, 40.0), next_spot_button.text)
+	next_spot_button.visible = false
+
+func _position_power_meter_for_foot() -> void:
+	if power_meter == null:
+		return
+	var x := 1110.0 if kicking_foot == "right" else 24.0
+	power_meter.position = Vector2(x, 178.0)
+	if power_label != null:
+		power_label.position = Vector2(x, 132.0)
+
+func _style_button(button: Button, pos: Vector2, size_value: Vector2, text_value: String) -> void:
+	button.position = pos
+	button.size = size_value
+	button.text = text_value
+	button.add_theme_font_size_override("font_size", 13)
+	button.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.78))
+	button.add_theme_stylebox_override("normal", _make_panel_style(Color(0.0, 0.0, 0.0, 0.28), Color(1.0, 1.0, 1.0, 0.18), 1, 6))
+	button.add_theme_stylebox_override("hover", _make_panel_style(Color(1.0, 1.0, 1.0, 0.10), Color(1.0, 1.0, 1.0, 0.42), 1, 6))
+	button.add_theme_stylebox_override("pressed", _make_panel_style(Color(1.0, 1.0, 1.0, 0.16), Color(1.0, 0.86, 0.25, 0.72), 1, 6))
+
+func _make_panel_style(bg: Color, border: Color, border_width: int, radius: int) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg
+	style.border_color = border
+	style.border_width_left = border_width
+	style.border_width_top = border_width
+	style.border_width_right = border_width
+	style.border_width_bottom = border_width
+	style.corner_radius_top_left = radius
+	style.corner_radius_top_right = radius
+	style.corner_radius_bottom_left = radius
+	style.corner_radius_bottom_right = radius
+	style.content_margin_left = 14
+	style.content_margin_top = 10
+	style.content_margin_right = 14
+	style.content_margin_bottom = 10
+	return style
 
 func _update_power_bar_color(power_value: float) -> void:
 	var fill := power_bar.get_theme_stylebox("fill") as StyleBoxFlat

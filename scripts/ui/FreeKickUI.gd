@@ -47,7 +47,7 @@ func hide_all() -> void:
 	instruction_label.visible = true
 	status_label.visible = true
 	restart_button.visible = false
-	switch_foot_button.visible = true
+	switch_foot_button.visible = false
 	next_spot_button.visible = false
 	feedback_label.remove_theme_stylebox_override("normal")
 	if support_marker_hint != null:
@@ -154,6 +154,12 @@ func set_kicking_foot(foot: String) -> void:
 func _support_foot_for_kick(kicking_foot: String) -> String:
 	return "left" if kicking_foot == "right" else "right"
 
+func show_power_ready() -> void:
+	hide_all()
+	instruction_label.visible = true
+	instruction_label.text = "Touch left for left foot · touch right for right foot"
+	set_status("POWER · choose kicking foot by screen side")
+
 func show_power(power_value: float) -> void:
 	_position_power_meter_for_foot()
 	power_label.visible = true
@@ -162,7 +168,7 @@ func show_power(power_value: float) -> void:
 	instruction_label.text = "Hold · release at 70–85%"
 	power_label.text = "%d%%" % roundi(power_value * 100.0)
 	power_meter.power_value = power_value
-	set_status("POWER · charge into the optimal zone, then release")
+	set_status("POWER · %s foot · charge into the optimal zone, then release" % kicking_foot.to_upper())
 
 func show_support_foot_sector(selected_foot: String, _difficulty: FreeKickDifficulty) -> void:
 	hide_all()
@@ -202,7 +208,7 @@ func update_support_marker(local_pos: Vector2) -> void:
 
 func update_support_foot_angle(angle: float, aim_target: float = 0.0) -> void:
 	if support_panel.visible:
-		support_panel.set_substep_label("2/2: subtle foot angle · ±30° max")
+		support_panel.set_substep_label("2/2: drag left/right to aim · ±30° max")
 		support_panel.set_foot_angle(angle, true, aim_target)
 	support_zone_aim_target = clampf(aim_target, -1.0, 1.0)
 	support_zone_show_angle = true
@@ -211,7 +217,7 @@ func update_support_foot_angle(angle: float, aim_target: float = 0.0) -> void:
 	var foot_offset := support_zone_aim_target * 30.0
 	var target_label := "RIGHT POST" if aim_target > 0.25 else "LEFT POST" if aim_target < -0.25 else "CENTER"
 	feedback_label.text = "Aim: %s · foot %+.0f°" % [target_label, foot_offset]
-	set_status("Angle to %s · release" % target_label)
+	set_status("Aim %s · drag left/right, release to shoot setup" % target_label)
 
 func show_ball_contact_ui() -> void:
 	hide_all()
@@ -340,7 +346,7 @@ func _apply_mvp_layout() -> void:
 	_style_button(restart_button, Vector2(24.0, 586.0), Vector2(158.0, 40.0), "Restart  R")
 	restart_button.visible = false
 	_style_button(switch_foot_button, Vector2(24.0, 594.0), Vector2(128.0, 32.0), "Foot  F")
-	switch_foot_button.visible = true
+	switch_foot_button.visible = false
 	_style_button(next_spot_button, Vector2(214.0, 586.0), Vector2(196.0, 40.0), next_spot_button.text)
 	next_spot_button.visible = false
 

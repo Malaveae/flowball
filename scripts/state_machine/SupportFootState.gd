@@ -78,23 +78,21 @@ func _input(event: InputEvent) -> void:
 func _update_from_screen(pos: Vector2) -> void:
 	var local := _screen_to_ball_local(pos)
 	if substep == Substep.LOCATION:
-		marker_local = FreeKickInputMapper.clamp_to_support_foot_side(local, radius, controller.input_data.selected_foot)
+		var target_marker := FreeKickInputMapper.clamp_to_support_foot_side(local, radius, controller.input_data.selected_foot)
+		marker_local = target_marker if not has_marker else marker_local.lerp(target_marker, 0.45)
 		has_marker = true
 		foot_angle = marker_local.angle() if marker_local.length() > 0.001 else 0.0
 		controller.ui.update_support_marker(marker_local)
 	else:
-		# Substep 2: subtle support-foot aiming, not a 360° rotation.
-		# Straight up means CENTER. The foot may rotate only 30° left/right:
-		# -30° = LEFT POST, 0° = CENTER, +30° = RIGHT POST.
-		var angle_vector := local - marker_local
-		if angle_vector.length() > 4.0:
-			var raw_offset := Vector2.UP.angle_to(angle_vector.normalized())
-			var max_offset := deg_to_rad(30.0)
-			var clamped_offset := clampf(raw_offset, -max_offset, max_offset)
-			foot_angle = Vector2.UP.rotated(clamped_offset).angle()
-			# UI convention: visual right in the support panel is +1/right post.
-			# World rotation sign is handled later by ShotCalculator.
-			aim_target = clampf(clamped_offset / max_offset, -1.0, 1.0)
+		# Substep 2 is a stable left/right aim slider, not a free rotation around the plant foot.
+		# This avoids twitchy angle jumps when the finger is close to the planted marker.
+		# Drag left = left post, center = center, drag right = right post.
+		var aim_width := radius * 0.75
+		var horizontal_offset := 0.0 if aim_width <= 0.0 else (local.x - marker_local.x) / aim_width
+		aim_target = clampf(horizontal_offset, -1.0, 1.0)
+		var max_offset := deg_to_rad(30.0)
+		var clamped_offset := aim_target * max_offset
+		foot_angle = Vector2.UP.rotated(clamped_offset).angle()
 		controller.ui.update_support_foot_angle(foot_angle, aim_target)
 
 func _align_world_marker() -> void:

@@ -36,7 +36,7 @@ func _ready() -> void:
 	state_machine.state_changed.connect(_on_state_changed)
 	state_machine.setup(self)
 
-func set_free_kick_spot(label: String, ball_position: Vector3, goal_position: Vector3 = Vector3(0.0, 1.2, -24.0)) -> void:
+func set_free_kick_spot(label: String, ball_position: Vector3, goal_position: Vector3 = Vector3(0.0, 1.2, -52.5)) -> void:
 	spot_label = label
 	free_kick_position = ball_position
 	var flat_to_goal := Vector3(goal_position.x - ball_position.x, 0.0, goal_position.z - ball_position.z)

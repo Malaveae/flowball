@@ -1,6 +1,8 @@
 class_name FreeKickUI
 extends CanvasLayer
 
+const LEFT_SUPPORT_BOOT_TEXTURE_PATH := "res://assets/PumaAttacantoIZQ.png"
+
 signal restart_requested
 signal switch_foot_requested
 signal next_spot_requested
@@ -22,6 +24,7 @@ signal next_spot_requested
 var kicking_foot := "right"
 var support_marker_hint: Control
 var support_zone_overlay: Control
+var left_support_boot_texture: Texture2D
 var support_zone_center := Vector2(640.0, 360.0)
 var support_zone_radius := 150.0
 var support_zone_marker_local := Vector2.ZERO
@@ -30,6 +33,7 @@ var support_zone_aim_target := 0.0
 var support_zone_show_angle := false
 
 func _ready() -> void:
+	left_support_boot_texture = _load_texture_from_png(LEFT_SUPPORT_BOOT_TEXTURE_PATH)
 	support_zone_overlay = _create_support_zone_overlay()
 	support_marker_hint = _create_support_marker_hint()
 	_apply_mvp_layout()
@@ -97,6 +101,7 @@ func _create_support_zone_overlay() -> Control:
 				var aim_end := marker + Vector2.UP.rotated(aim_angle) * 62.0
 				overlay.draw_line(marker, aim_end, Color(1.0, 0.86, 0.22, 0.95), 3.0)
 				overlay.draw_circle(aim_end, 5.0, Color(1.0, 0.86, 0.22, 1.0))
+				_draw_support_foot_indicator(overlay, marker, true, aim_angle)
 		var side_text := "LEFT" if kicking_foot == "right" else "RIGHT"
 		overlay.draw_string(overlay.get_theme_default_font(), center + Vector2(-96.0, radius + 28.0), "Plant zone: %s side · drag then aim" % side_text, HORIZONTAL_ALIGNMENT_CENTER, 192.0, 13, Color(1, 1, 1, 0.7))
 	)
@@ -121,7 +126,9 @@ func _create_support_marker_hint() -> Control:
 		marker.draw_circle(center, 7.0, legal_color)
 		marker.draw_line(center + Vector2(-22.0, 0.0), center + Vector2(22.0, 0.0), ghost_color, 1.0)
 		marker.draw_line(center + Vector2(0.0, -22.0), center + Vector2(0.0, 22.0), ghost_color, 1.0)
-		var label := "PLANT"
+		if support_zone_show_angle:
+			_draw_support_foot_indicator(marker, center, true, deg_to_rad(support_zone_aim_target * 30.0))
+		var label := "LEFT PLANT" if kicking_foot == "right" else "RIGHT PLANT"
 		marker.draw_string(marker.get_theme_default_font(), Vector2(0.0, 88.0), label, HORIZONTAL_ALIGNMENT_CENTER, marker.size.x, 10, Color(1, 1, 1, 0.72))
 	)
 	if root != null:
@@ -149,6 +156,8 @@ func _create_score_label() -> Label:
 
 func set_kicking_foot(foot: String) -> void:
 	kicking_foot = foot
+	if power_meter != null:
+		power_meter.kicking_foot = foot
 	_position_power_meter_for_foot()
 
 func _support_foot_for_kick(kicking_foot: String) -> String:
@@ -212,6 +221,10 @@ func update_support_foot_angle(angle: float, aim_target: float = 0.0) -> void:
 		support_panel.set_foot_angle(angle, true, aim_target)
 	support_zone_aim_target = clampf(aim_target, -1.0, 1.0)
 	support_zone_show_angle = true
+	if support_marker_hint != null:
+		support_marker_hint.visible = true
+		support_marker_hint.position = _support_marker_screen_position() - support_marker_hint.size * 0.5
+		support_marker_hint.queue_redraw()
 	if support_zone_overlay != null:
 		support_zone_overlay.queue_redraw()
 	var foot_offset := support_zone_aim_target * 30.0
@@ -276,6 +289,25 @@ func align_support_marker_hint(ball: Node3D, camera: Camera3D, selected_foot: St
 func _support_marker_screen_position() -> Vector2:
 	return support_zone_center + support_zone_marker_local
 
+func _draw_support_foot_indicator(canvas: CanvasItem, center: Vector2, active: bool = true, rotation: float = 0.0) -> void:
+	var boot_size := Vector2(42.0, 76.0)
+	var alpha := 1.0 if active else 0.55
+	var mirror_scale := Vector2.ONE if kicking_foot == "right" else Vector2(-1.0, 1.0)
+	canvas.draw_set_transform(center, rotation, mirror_scale)
+	if left_support_boot_texture != null:
+		canvas.draw_texture_rect(left_support_boot_texture, Rect2(-boot_size * 0.5, boot_size), false, Color(1.0, 1.0, 1.0, alpha))
+	else:
+		canvas.draw_rect(Rect2(-boot_size * 0.5, boot_size), Color(1.0, 1.0, 1.0, alpha), true)
+	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+func _load_texture_from_png(path: String) -> Texture2D:
+	var image := Image.new()
+	var error := image.load(path)
+	if error != OK:
+		push_warning("Could not load support foot texture: %s" % path)
+		return null
+	return ImageTexture.create_from_image(image)
+
 func _support_hint_position(local_pos: Vector2) -> Vector2:
 	return support_zone_center + local_pos
 
@@ -327,7 +359,8 @@ func _apply_mvp_layout() -> void:
 	power_bar.visible = false
 	power_bar.position = Vector2(24.0, 64.0)
 	power_bar.size = Vector2(260.0, 6.0)
-	power_meter.size = Vector2(74.0, 320.0)
+	power_meter.size = Vector2(150.0, 320.0)
+	power_meter.kicking_foot = kicking_foot
 	_position_power_meter_for_foot()
 	feedback_label.position = Vector2(24.0, 304.0)
 	feedback_label.size = Vector2(430.0, 58.0)
@@ -353,7 +386,10 @@ func _apply_mvp_layout() -> void:
 func _position_power_meter_for_foot() -> void:
 	if power_meter == null:
 		return
-	var x := 1110.0 if kicking_foot == "right" else 24.0
+	var viewport_width := get_viewport().get_visible_rect().size.x
+	if viewport_width <= 0.0:
+		viewport_width = 1280.0
+	var x := maxf(24.0, viewport_width - power_meter.size.x - 24.0) if kicking_foot == "right" else 24.0
 	power_meter.position = Vector2(x, 178.0)
 	if power_label != null:
 		power_label.position = Vector2(x, 132.0)

@@ -1,6 +1,13 @@
 class_name PowerMeterPanel
 extends Control
 
+const BOOT_TEXTURE_PATH := "res://assets/PumaAttacantoIZQ.png"
+
+@export_enum("right", "left") var kicking_foot: String = "right":
+	set(value):
+		kicking_foot = value
+		queue_redraw()
+
 @export var power_value: float = 0.0:
 	set(value):
 		power_value = clampf(value, 0.0, 1.0)
@@ -9,9 +16,22 @@ extends Control
 const OPTIMAL_MIN := 0.70
 const OPTIMAL_MAX := 0.85
 
+var boot_texture: Texture2D
+
+func _ready() -> void:
+	boot_texture = _load_texture_from_png(BOOT_TEXTURE_PATH)
+
 func _draw() -> void:
-	var bar_rect := Rect2(22.0, 12.0, 28.0, size.y - 24.0)
 	var font := get_theme_default_font()
+	var boot_rect := Rect2(Vector2.ZERO, Vector2(58.0, 106.0))
+	var bar_rect := Rect2(Vector2.ZERO, Vector2(28.0, size.y - 24.0))
+	if kicking_foot == "right":
+		boot_rect.position = Vector2(size.x - boot_rect.size.x - 8.0, size.y * 0.5 - boot_rect.size.y * 0.5)
+		bar_rect.position = Vector2(18.0, 12.0)
+	else:
+		boot_rect.position = Vector2(8.0, size.y * 0.5 - boot_rect.size.y * 0.5)
+		bar_rect.position = Vector2(size.x - bar_rect.size.x - 18.0, 12.0)
+	_draw_kicking_boot(boot_rect)
 
 	var shell := StyleBoxFlat.new()
 	shell.bg_color = Color(0.0, 0.0, 0.0, 0.34)
@@ -52,7 +72,26 @@ func _draw() -> void:
 	var pointer_color := _power_color(power_value, 1.0)
 	draw_line(Vector2(inner.position.x - 9.0, pointer_y), Vector2(inner.end.x + 9.0, pointer_y), Color(1, 1, 1, 0.58), 2.0)
 	draw_circle(Vector2(inner.get_center().x, pointer_y), 5.0, pointer_color)
-	draw_string(font, Vector2(0.0, size.y - 2.0), "POWER", HORIZONTAL_ALIGNMENT_CENTER, size.x, 12, Color(1, 1, 1, 0.48))
+	draw_string(font, Vector2(0.0, size.y - 2.0), "%s FOOT  ·  POWER" % kicking_foot.to_upper(), HORIZONTAL_ALIGNMENT_CENTER, size.x, 12, Color(1, 1, 1, 0.48))
+
+func _draw_kicking_boot(rect: Rect2) -> void:
+	var center := rect.get_center()
+	var scale := Vector2(-1.0, 1.0) if kicking_foot == "right" else Vector2.ONE
+	draw_set_transform(center, 0.0, scale)
+	var local_rect := Rect2(-rect.size * 0.5, rect.size)
+	if boot_texture != null:
+		draw_texture_rect(boot_texture, local_rect, false, Color(1.0, 1.0, 1.0, 0.96))
+	else:
+		draw_rect(local_rect, Color(1.0, 1.0, 1.0, 0.7), true)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+func _load_texture_from_png(path: String) -> Texture2D:
+	var image := Image.new()
+	var error := image.load(path)
+	if error != OK:
+		push_warning("Could not load power foot texture: %s" % path)
+		return null
+	return ImageTexture.create_from_image(image)
 
 func _draw_vertical_segment(rect: Rect2, from_t: float, to_t: float, color: Color, glow: Color) -> void:
 	var y1 := rect.end.y - rect.size.y * from_t

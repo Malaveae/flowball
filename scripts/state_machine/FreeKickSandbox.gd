@@ -7,19 +7,19 @@ const DEFAULT_WALL_PLAYER_COUNT := 5
 const WALL_PLAYER_SPACING := 0.78
 const WALL_PLAYER_HEIGHT := 1.8
 const WALL_PLAYER_RADIUS := 0.26
-const GOAL_CENTER := Vector3(0.0, 1.2, -24.0)
+const GOAL_CENTER := Vector3(0.0, 1.2, -52.5)
 
 var wall_root: Node3D
 var wall_material: StandardMaterial3D
 
 var set_piece_spots := [
-	{"label": "Warm-up center 20m", "position": Vector3(0.0, 0.16, -4.0), "wall_count": 0},
-	{"label": "Center 24m", "position": Vector3(0.0, 0.16, 0.0), "wall_count": 0},
-	{"label": "Left half-space 22m", "position": Vector3(-4.5, 0.16, -2.0), "wall_count": 2},
-	{"label": "Right half-space 22m", "position": Vector3(4.5, 0.16, -2.0), "wall_count": 2},
-	{"label": "Deep center 30m", "position": Vector3(0.0, 0.16, 6.0), "wall_count": 4},
-	{"label": "Wide left 25m", "position": Vector3(-7.5, 0.16, 0.5), "wall_count": 5},
-	{"label": "Wide right 25m", "position": Vector3(7.5, 0.16, 0.5), "wall_count": 5},
+	{"label": "Warm-up center 20m", "position": Vector3(0.0, 0.16, -32.5), "wall_count": 0},
+	{"label": "Center 24m", "position": Vector3(0.0, 0.16, -28.5), "wall_count": 0},
+	{"label": "Left half-space 22m", "position": Vector3(-4.5, 0.16, -30.5), "wall_count": 2},
+	{"label": "Right half-space 22m", "position": Vector3(4.5, 0.16, -30.5), "wall_count": 2},
+	{"label": "Deep center 30m", "position": Vector3(0.0, 0.16, -22.5), "wall_count": 4},
+	{"label": "Wide left 25m", "position": Vector3(-7.5, 0.16, -27.5), "wall_count": 5},
+	{"label": "Wide right 25m", "position": Vector3(7.5, 0.16, -27.5), "wall_count": 5},
 ]
 var spot_index := 0
 var total_goals := 0
@@ -47,7 +47,7 @@ func start_new_attempt(selected_foot: String = "right") -> void:
 func _apply_set_piece_spot() -> void:
 	var spot: Dictionary = set_piece_spots[spot_index]
 	var ball_position := spot["position"] as Vector3
-	controller.set_free_kick_spot(String(spot["label"]), ball_position)
+	controller.set_free_kick_spot(String(spot["label"]), ball_position, GOAL_CENTER)
 	_position_wall_dummies(ball_position, int(spot.get("wall_count", DEFAULT_WALL_PLAYER_COUNT)))
 	_update_scoreboard()
 

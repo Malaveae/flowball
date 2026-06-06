@@ -5,7 +5,7 @@ signal mode_changed(mode: StringName)
 
 @export var camera_path: NodePath
 @export var target_path: NodePath
-@export var goal_position: Vector3 = Vector3(0.0, 1.2, -24.0)
+@export var goal_position: Vector3 = Vector3(0.0, 1.2, -52.5)
 @export var blend_time: float = 0.35
 @export var match_view_transform := Transform3D(Basis(), Vector3(0.0, 7.0, 8.0))
 @export var power_view_transform := Transform3D(Basis(), Vector3(0.0, 6.0, 7.0))
@@ -18,6 +18,9 @@ signal mode_changed(mode: StringName)
 @export var default_fov: float = 70.0
 @export var contact_fov: float = 38.0
 @export var shot_follow_fov: float = 55.0
+# Keep gameplay cameras inside the stadium bowl so side/end stands do not occlude the shot.
+@export var camera_bounds_min: Vector3 = Vector3(-32.0, 0.0, -51.0)
+@export var camera_bounds_max: Vector3 = Vector3(32.0, 20.0, 51.0)
 
 var mode: StringName = &"MATCH_VIEW"
 var _tween: Tween
@@ -66,9 +69,10 @@ func _goal_centered_transform(next_mode: StringName) -> Transform3D:
 
 	match next_mode:
 		&"POWER_VIEW":
-			height = 4.6
-			behind = clampf(distance * 0.42, 8.0, 15.0)
-			look_height = 1.25
+			# Initial free-kick view: near player-eye perspective, about two meters behind the ball.
+			height = 1.65
+			behind = 2.0
+			look_height = 0.45
 		&"SUPPORT_TOP_DOWN":
 			height = 8.0
 			behind = clampf(distance * 0.18, 4.0, 7.0)
@@ -87,7 +91,11 @@ func _goal_centered_transform(next_mode: StringName) -> Transform3D:
 			behind = clampf(distance * 0.4, 8.0, 14.0)
 
 	var origin := ball - dir * behind + right * side + Vector3.UP * height
+	origin = _clamp_camera_origin(origin)
 	var target := goal.lerp(ball, 0.18) + Vector3.UP * look_height
+	if next_mode == &"POWER_VIEW":
+		# Keep the ball visible in the lower foreground while still seeing the goal line.
+		target = ball + dir * 3.0 + Vector3.UP * 0.22
 	return Transform3D(Basis.looking_at((target - origin).normalized(), Vector3.UP), origin)
 
 func _support_top_down_transform() -> Transform3D:
@@ -106,6 +114,13 @@ func _ball_contact_transform() -> Transform3D:
 	var origin := ball - dir * 0.85 + Vector3.UP * 0.42
 	var target := ball + dir * 0.2 + Vector3.UP * 0.05
 	return Transform3D(Basis.looking_at((target - origin).normalized(), Vector3.UP), origin)
+
+func _clamp_camera_origin(origin: Vector3) -> Vector3:
+	return Vector3(
+		clampf(origin.x, camera_bounds_min.x, camera_bounds_max.x),
+		clampf(origin.y, camera_bounds_min.y, camera_bounds_max.y),
+		clampf(origin.z, camera_bounds_min.z, camera_bounds_max.z)
+	)
 
 func _fov_for_mode(next_mode: StringName) -> float:
 	match next_mode:

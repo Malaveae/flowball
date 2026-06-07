@@ -87,10 +87,12 @@ static func _plant_stability(plant_depth: float) -> float:
 static func _support_aim_target_offset(target: float) -> float:
 	# Step 2 substep B: the foot points at a target lane, independent of support-foot side.
 	# Input convention: -1 = left post, 0 = center, +1 = right post.
+	# Keep this close to real free-kick geometry: from ~24m, aiming from center to a post
+	# is roughly 9 degrees, so full stick should bias toward a post, not far outside it.
 	# Godot uses -Z as the forward goal direction in this scene. Rotating Vector3(0,0,-1)
 	# around +Y by a positive angle moves it toward world-left (negative X), so gameplay
 	# right must be converted to a negative Y-rotation angle.
-	return -clampf(target, -1.0, 1.0) * 45.0
+	return -clampf(target, -1.0, 1.0) * 11.0
 
 static func _curve_bias_from_support(support_x: float, selected_foot: String) -> float:
 	var foot_sign := -1.0 if selected_foot == "right" else 1.0

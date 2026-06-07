@@ -26,12 +26,9 @@ func _draw() -> void:
 	var boot_rect := Rect2(Vector2.ZERO, Vector2(58.0, 106.0))
 	var bar_rect := Rect2(Vector2.ZERO, Vector2(28.0, size.y - 24.0))
 	if kicking_foot == "right":
-		boot_rect.position = Vector2(size.x - boot_rect.size.x - 8.0, size.y * 0.5 - boot_rect.size.y * 0.5)
 		bar_rect.position = Vector2(18.0, 12.0)
 	else:
-		boot_rect.position = Vector2(8.0, size.y * 0.5 - boot_rect.size.y * 0.5)
 		bar_rect.position = Vector2(size.x - bar_rect.size.x - 18.0, 12.0)
-	_draw_kicking_boot(boot_rect)
 
 	var shell := StyleBoxFlat.new()
 	shell.bg_color = Color(0.0, 0.0, 0.0, 0.34)
@@ -72,7 +69,35 @@ func _draw() -> void:
 	var pointer_color := _power_color(power_value, 1.0)
 	draw_line(Vector2(inner.position.x - 9.0, pointer_y), Vector2(inner.end.x + 9.0, pointer_y), Color(1, 1, 1, 0.58), 2.0)
 	draw_circle(Vector2(inner.get_center().x, pointer_y), 5.0, pointer_color)
+
+	var boot_y := clampf(pointer_y - boot_rect.size.y * 0.5, 8.0, size.y - boot_rect.size.y - 24.0)
+	if kicking_foot == "right":
+		boot_rect.position = Vector2(size.x - boot_rect.size.x - 8.0, boot_y)
+	else:
+		boot_rect.position = Vector2(8.0, boot_y)
+	_draw_kicking_boot(boot_rect)
+	_draw_power_value_label(boot_rect, pointer_y, pointer_color)
 	draw_string(font, Vector2(0.0, size.y - 2.0), "%s FOOT  ·  POWER" % kicking_foot.to_upper(), HORIZONTAL_ALIGNMENT_CENTER, size.x, 12, Color(1, 1, 1, 0.48))
+
+func _draw_power_value_label(boot_rect: Rect2, pointer_y: float, color: Color) -> void:
+	var font := get_theme_default_font()
+	var label_size := Vector2(48.0, 24.0)
+	var x := boot_rect.position.x - label_size.x - 6.0 if kicking_foot == "right" else boot_rect.end.x + 6.0
+	var y := clampf(pointer_y - label_size.y * 0.5, 8.0, size.y - label_size.y - 8.0)
+	var rect := Rect2(Vector2(x, y), label_size)
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.0, 0.0, 0.0, 0.42)
+	bg.border_color = color
+	bg.border_width_left = 1
+	bg.border_width_top = 1
+	bg.border_width_right = 1
+	bg.border_width_bottom = 1
+	bg.corner_radius_top_left = 8
+	bg.corner_radius_top_right = 8
+	bg.corner_radius_bottom_left = 8
+	bg.corner_radius_bottom_right = 8
+	draw_style_box(bg, rect)
+	draw_string(font, rect.position + Vector2(0.0, 17.0), "%d%%" % roundi(power_value * 100.0), HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 14, Color(1.0, 1.0, 1.0, 0.92))
 
 func _draw_kicking_boot(rect: Rect2) -> void:
 	var center := rect.get_center()

@@ -14,6 +14,7 @@ func enter(_controller: FreeKickController) -> void:
 	controller.ui.show_power_ready()
 
 func _process(delta: float) -> void:
+	controller.ui.align_power_meter_to_ball(controller.get_ball(), controller.camera_rig.get_camera())
 	if charging:
 		hold_time += delta
 		controller.input_data.hold_time = hold_time

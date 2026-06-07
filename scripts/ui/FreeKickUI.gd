@@ -165,13 +165,14 @@ func _support_foot_for_kick(kicking_foot: String) -> String:
 
 func show_power_ready() -> void:
 	hide_all()
+	_position_power_meter_for_foot()
 	instruction_label.visible = true
 	instruction_label.text = "Touch left for left foot · touch right for right foot"
 	set_status("POWER · choose kicking foot by screen side")
 
 func show_power(power_value: float) -> void:
 	_position_power_meter_for_foot()
-	power_label.visible = true
+	power_label.visible = false
 	power_meter.visible = true
 	instruction_label.visible = true
 	instruction_label.text = "Hold · release at 70–85%"
@@ -383,16 +384,32 @@ func _apply_mvp_layout() -> void:
 	_style_button(next_spot_button, Vector2(214.0, 586.0), Vector2(196.0, 40.0), next_spot_button.text)
 	next_spot_button.visible = false
 
+func align_power_meter_to_ball(ball: Node3D, camera: Camera3D) -> void:
+	if ball == null or camera == null or power_meter == null:
+		_position_power_meter_for_foot()
+		return
+	var ball_screen := camera.unproject_position(ball.global_position)
+	var side := 1.0 if kicking_foot == "right" else -1.0
+	var desired := ball_screen + Vector2(side * 145.0, -170.0)
+	var viewport_size := get_viewport().get_visible_rect().size
+	var x := clampf(desired.x - power_meter.size.x * 0.5, 18.0, viewport_size.x - power_meter.size.x - 18.0)
+	var y := clampf(desired.y, 80.0, viewport_size.y - power_meter.size.y - 72.0)
+	power_meter.position = Vector2(x, y)
+	if power_label != null:
+		power_label.position = Vector2(x, y - 46.0)
+
 func _position_power_meter_for_foot() -> void:
 	if power_meter == null:
 		return
 	var viewport_width := get_viewport().get_visible_rect().size.x
 	if viewport_width <= 0.0:
 		viewport_width = 1280.0
-	var x := maxf(24.0, viewport_width - power_meter.size.x - 24.0) if kicking_foot == "right" else 24.0
-	power_meter.position = Vector2(x, 178.0)
+	var center_x := viewport_width * 0.5
+	var side := 1.0 if kicking_foot == "right" else -1.0
+	var x := clampf(center_x + side * 145.0 - power_meter.size.x * 0.5, 18.0, viewport_width - power_meter.size.x - 18.0)
+	power_meter.position = Vector2(x, 250.0)
 	if power_label != null:
-		power_label.position = Vector2(x, 132.0)
+		power_label.position = Vector2(x, 204.0)
 
 func _style_button(button: Button, pos: Vector2, size_value: Vector2, text_value: String) -> void:
 	button.position = pos

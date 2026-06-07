@@ -22,6 +22,10 @@ func start_recording(target_ball: FreeKickBall3D, params: ShotParams) -> void:
 	_outcome = &"in_flight"
 	set_process(true)
 
+func record_sample_now() -> void:
+	if recording and ball != null and telemetry != null:
+		telemetry.add_sample(ball.global_position, ball.linear_velocity)
+
 func stop_recording(outcome: StringName) -> void:
 	_outcome = outcome
 	recording = false

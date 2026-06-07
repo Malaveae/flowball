@@ -61,28 +61,31 @@ white = mat("painted_white_metal", (0.92, 0.92, 0.88, 1.0), 0.42)
 net = mat("net_cord_bluewhite", (0.75, 0.9, 1.0, 0.42), 0.8)
 net.blend_method = "BLEND"
 
-half_w = 7.32 / 2.0
-height = 2.44
+inside_w = 7.32
+crossbar_lower_height = 2.44
 depth = 1.8
 post_r = 0.06
+post_center_x = inside_w / 2.0 + post_r
+crossbar_center_height = crossbar_lower_height + post_r
 
-# Front frame at Blender Y=0.
-cylinder_between("LeftPost", (-half_w, 0, 0), (-half_w, 0, height), post_r, white)
-cylinder_between("RightPost", (half_w, 0, 0), (half_w, 0, height), post_r, white)
-cylinder_between("Crossbar", (-half_w, 0, height), (half_w, 0, height), post_r, white)
+# Front frame at Blender Y=0. Professional goal dimensions are 7.32m between the inside
+# of the posts and 2.44m from ground to the underside of the crossbar.
+cylinder_between("LeftPost", (-post_center_x, 0, 0), (-post_center_x, 0, crossbar_lower_height), post_r, white)
+cylinder_between("RightPost", (post_center_x, 0, 0), (post_center_x, 0, crossbar_lower_height), post_r, white)
+cylinder_between("Crossbar", (-post_center_x, 0, crossbar_center_height), (post_center_x, 0, crossbar_center_height), post_r, white)
 # Back support/net frame at Blender Y=depth.
-cylinder_between("LeftBackSupport", (-half_w, 0, height), (-half_w, depth, 0.08), post_r * 0.65, white)
-cylinder_between("RightBackSupport", (half_w, 0, height), (half_w, depth, 0.08), post_r * 0.65, white)
-cylinder_between("BackBottom", (-half_w, depth, 0.08), (half_w, depth, 0.08), post_r * 0.55, white)
+cylinder_between("LeftBackSupport", (-post_center_x, 0, crossbar_center_height), (-post_center_x, depth, 0.08), post_r * 0.65, white)
+cylinder_between("RightBackSupport", (post_center_x, 0, crossbar_center_height), (post_center_x, depth, 0.08), post_r * 0.65, white)
+cylinder_between("BackBottom", (-post_center_x, depth, 0.08), (post_center_x, depth, 0.08), post_r * 0.55, white)
 
 # Net grid.
 for i in range(9):
-    x = -half_w + (7.32 / 8.0) * i
-    cylinder_between(f"NetVertical_{i}", (x, depth, 0.12), (x, 0, height), 0.008, net)
+    x = -inside_w / 2.0 + (inside_w / 8.0) * i
+    cylinder_between(f"NetVertical_{i}", (x, depth, 0.12), (x, 0, crossbar_lower_height), 0.008, net)
 for j in range(5):
-    z = 0.18 + ((height - 0.18) / 4.0) * j
-    y = depth * (1.0 - z / height * 0.35)
-    cylinder_between(f"NetHorizontal_{j}", (-half_w, y, z), (half_w, y, z), 0.008, net)
+    z = 0.18 + ((crossbar_lower_height - 0.18) / 4.0) * j
+    y = depth * (1.0 - z / crossbar_lower_height * 0.35)
+    cylinder_between(f"NetHorizontal_{j}", (-inside_w / 2.0, y, z), (inside_w / 2.0, y, z), 0.008, net)
 
 bpy.ops.export_scene.gltf(filepath=str(GOAL_OUT), export_format="GLB", export_apply=True, export_materials="EXPORT")
 print(f"Exported {GOAL_OUT}")

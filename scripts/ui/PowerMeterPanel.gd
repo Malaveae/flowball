@@ -1,7 +1,7 @@
 class_name PowerMeterPanel
 extends Control
 
-const BOOT_TEXTURE_PATH := "res://assets/PumaAttacantoIZQ.png"
+const BOOT_TEXTURE := preload("res://assets/PumaAttacantoIZQ.png")
 
 @export_enum("right", "left") var kicking_foot: String = "right":
 	set(value):
@@ -16,10 +16,7 @@ const BOOT_TEXTURE_PATH := "res://assets/PumaAttacantoIZQ.png"
 const OPTIMAL_MIN := 0.70
 const OPTIMAL_MAX := 0.85
 
-var boot_texture: Texture2D
-
-func _ready() -> void:
-	boot_texture = _load_texture_from_png(BOOT_TEXTURE_PATH)
+var boot_texture: Texture2D = BOOT_TEXTURE
 
 func _draw() -> void:
 	var font := get_theme_default_font()
@@ -109,14 +106,6 @@ func _draw_kicking_boot(rect: Rect2) -> void:
 	else:
 		draw_rect(local_rect, Color(1.0, 1.0, 1.0, 0.7), true)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-
-func _load_texture_from_png(path: String) -> Texture2D:
-	var image := Image.new()
-	var error := image.load(path)
-	if error != OK:
-		push_warning("Could not load power foot texture: %s" % path)
-		return null
-	return ImageTexture.create_from_image(image)
 
 func _draw_vertical_segment(rect: Rect2, from_t: float, to_t: float, color: Color, glow: Color) -> void:
 	var y1 := rect.end.y - rect.size.y * from_t

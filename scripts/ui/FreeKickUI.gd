@@ -1,7 +1,7 @@
 class_name FreeKickUI
 extends CanvasLayer
 
-const LEFT_SUPPORT_BOOT_TEXTURE_PATH := "res://assets/PumaAttacantoIZQ.png"
+const LEFT_SUPPORT_BOOT_TEXTURE := preload("res://assets/PumaAttacantoIZQ.png")
 
 signal restart_requested
 signal switch_foot_requested
@@ -33,7 +33,7 @@ var support_zone_aim_target := 0.0
 var support_zone_show_angle := false
 
 func _ready() -> void:
-	left_support_boot_texture = _load_texture_from_png(LEFT_SUPPORT_BOOT_TEXTURE_PATH)
+	left_support_boot_texture = LEFT_SUPPORT_BOOT_TEXTURE
 	support_zone_overlay = _create_support_zone_overlay()
 	support_marker_hint = _create_support_marker_hint()
 	_apply_mvp_layout()
@@ -300,14 +300,6 @@ func _draw_support_foot_indicator(canvas: CanvasItem, center: Vector2, active: b
 	else:
 		canvas.draw_rect(Rect2(-boot_size * 0.5, boot_size), Color(1.0, 1.0, 1.0, alpha), true)
 	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-
-func _load_texture_from_png(path: String) -> Texture2D:
-	var image := Image.new()
-	var error := image.load(path)
-	if error != OK:
-		push_warning("Could not load support foot texture: %s" % path)
-		return null
-	return ImageTexture.create_from_image(image)
 
 func _support_hint_position(local_pos: Vector2) -> Vector2:
 	return support_zone_center + local_pos

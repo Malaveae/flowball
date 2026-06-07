@@ -18,6 +18,10 @@ signal mode_changed(mode: StringName)
 @export var default_fov: float = 70.0
 @export var contact_fov: float = 38.0
 @export var shot_follow_fov: float = 55.0
+@export var broadcast_follow_smoothness: float = 5.5
+@export var broadcast_follow_height: float = 1.85
+@export var broadcast_follow_behind: float = 4.2
+@export var broadcast_follow_side: float = 0.65
 # Keep gameplay cameras inside the stadium bowl so side/end stands do not occlude the shot.
 @export var camera_bounds_min: Vector3 = Vector3(-32.0, 0.0, -51.0)
 @export var camera_bounds_max: Vector3 = Vector3(32.0, 20.0, 51.0)
@@ -34,6 +38,16 @@ func set_mode(next_mode: StringName) -> void:
 
 func get_camera() -> Camera3D:
 	return get_node_or_null(camera_path) as Camera3D
+
+func _process(delta: float) -> void:
+	if mode != &"SHOT_FOLLOW":
+		return
+	var camera := get_camera()
+	if camera == null:
+		return
+	var target_transform := _broadcast_follow_transform()
+	var weight := 1.0 - exp(-broadcast_follow_smoothness * delta)
+	camera.global_transform = camera.global_transform.interpolate_with(target_transform, weight)
 
 func _apply_camera_transform(camera: Camera3D, target: Transform3D, target_fov: float) -> void:
 	camera.current = true
@@ -94,8 +108,8 @@ func _goal_centered_transform(next_mode: StringName) -> Transform3D:
 	origin = _clamp_camera_origin(origin)
 	var target := goal.lerp(ball, 0.18) + Vector3.UP * look_height
 	if next_mode == &"POWER_VIEW":
-		# Keep the ball visible in the lower foreground while still seeing the goal line.
-		target = ball + dir * 3.0 + Vector3.UP * 0.22
+		# Initial eye-level view behind the ball: look slightly higher so the horizon sits lower and feels less top-down.
+		target = ball + dir * 3.0 + Vector3.UP * 0.55
 	return Transform3D(Basis.looking_at((target - origin).normalized(), Vector3.UP), origin)
 
 func _support_top_down_transform() -> Transform3D:
@@ -103,6 +117,20 @@ func _support_top_down_transform() -> Transform3D:
 	var ball := _target_position()
 	var origin := ball + Vector3.UP * 5.2
 	return Transform3D(Basis.looking_at(Vector3.DOWN, Vector3.FORWARD), origin)
+
+func _broadcast_follow_transform() -> Transform3D:
+	var ball := _target_position()
+	var to_goal := (goal_position - ball).slide(Vector3.UP)
+	if to_goal.length() < 0.01:
+		to_goal = Vector3.FORWARD
+	var dir := to_goal.normalized()
+	var right := dir.cross(Vector3.UP).normalized()
+	# Shooter-perspective follow: stay low and almost centered behind the ball,
+	# like the kicker watching the shot leave the foot instead of a sideline broadcast camera.
+	var origin := ball - dir * broadcast_follow_behind + right * broadcast_follow_side + Vector3.UP * broadcast_follow_height
+	origin = _clamp_camera_origin(origin)
+	var target := ball + dir * 4.0 + Vector3.UP * 0.65
+	return Transform3D(Basis.looking_at((target - origin).normalized(), Vector3.UP), origin)
 
 func _ball_contact_transform() -> Transform3D:
 	# Contact mode intentionally centers the real foreground ball for touch input, not the goal.

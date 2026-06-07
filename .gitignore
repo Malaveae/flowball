@@ -1,2 +1,5 @@
 # Local Pi runtime state
 .atl/
+
+# Godot generated shader cache
+.godot/shader_cache/

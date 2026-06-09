@@ -76,7 +76,12 @@ func _support_feedback(input_data: FreeKickInputData) -> String:
 		angle_note = "foot angle aimed right post"
 	elif input_data.support_aim_target < -0.25:
 		angle_note = "foot angle aimed left post"
-	return "%s · %s · %s" % [side_note, depth_note, angle_note]
+	var quality_note := "stable anchor"
+	if input_data.support_quality < 0.45:
+		quality_note = "poor anchor: less power/control"
+	elif input_data.support_quality < 0.72:
+		quality_note = "risky anchor"
+	return "%s · %s · %s · %s" % [side_note, depth_note, angle_note, quality_note]
 
 func _coach_tip(input_data: FreeKickInputData, params: ShotParams, report: FreeKickFeedbackReport) -> String:
 	if input_data.used_default_support or input_data.used_default_contact:

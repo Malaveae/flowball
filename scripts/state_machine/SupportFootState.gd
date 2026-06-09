@@ -126,6 +126,8 @@ func _commit(use_default: bool) -> void:
 		controller.input_data.plant_depth = 0.0
 		controller.input_data.support_foot_angle = 0.0
 		controller.input_data.support_aim_target = 0.0
+		controller.input_data.support_quality = 0.72
+		controller.input_data.support_angle_quality = 0.85
 		controller.input_data.used_default_support = true
 		controller.input_data.support_timer_expired = use_default
 	else:
@@ -135,4 +137,33 @@ func _commit(use_default: bool) -> void:
 		controller.input_data.plant_depth = clampf(support.y, -1.0, 1.0)
 		controller.input_data.support_foot_angle = foot_angle
 		controller.input_data.support_aim_target = aim_target
+		controller.input_data.support_quality = _support_quality(support)
+		controller.input_data.support_angle_quality = _support_angle_quality(aim_target)
 	finished.emit(&"BallContactState")
+
+func _support_quality(support: Vector2) -> float:
+	# Hidden biomechanical anchor model from piedeapoyo.md.
+	# Normalized UI distances map roughly to real plant distance bands:
+	# 0.00-0.15 too close, 0.20-0.35 optimal, 0.40-0.55 risky, >0.55 strongly penalized.
+	var lateral_distance := absf(support.x)
+	var depth := support.y
+	var lateral_quality: float
+	if lateral_distance < 0.15:
+		lateral_quality = lerpf(0.35, 0.72, lateral_distance / 0.15)
+	elif lateral_distance <= 0.35:
+		lateral_quality = 1.0
+	elif lateral_distance <= 0.55:
+		lateral_quality = lerpf(0.82, 0.52, (lateral_distance - 0.35) / 0.20)
+	else:
+		lateral_quality = lerpf(0.48, 0.20, clampf((lateral_distance - 0.55) / 0.45, 0.0, 1.0))
+	# Slightly ahead/open is balanced for free kicks; too far ahead/behind hurts stability.
+	var depth_quality := 1.0 - clampf(absf(depth + 0.10) / 0.75, 0.0, 1.0) * 0.35
+	return clampf(lateral_quality * depth_quality, 0.18, 1.0)
+
+func _support_angle_quality(target: float) -> float:
+	# 0 = foot points at target for straight/power. 10-25° open is still good for curl.
+	# The aim slider maps to about ±30° visually, so full extremes trade control for shape.
+	var open_amount := absf(clampf(target, -1.0, 1.0))
+	if open_amount <= 0.55:
+		return 1.0
+	return lerpf(0.86, 0.62, (open_amount - 0.55) / 0.45)

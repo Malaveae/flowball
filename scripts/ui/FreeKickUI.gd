@@ -7,6 +7,85 @@ signal restart_requested
 signal switch_foot_requested
 signal next_spot_requested
 
+class ModernScoreHud:
+	extends Control
+
+	var level := 1
+	var goals := 0
+	var attempts := 0
+	var misses := 0
+	var max_misses := 3
+	var message := ""
+	var fallback_text := ""
+
+	func set_stats(next_level: int, next_goals: int, next_attempts: int, next_misses: int, next_max_misses: int, next_message: String = "") -> void:
+		level = max(1, next_level)
+		goals = max(0, next_goals)
+		attempts = max(0, next_attempts)
+		misses = clampi(next_misses, 0, max(1, next_max_misses))
+		max_misses = max(1, next_max_misses)
+		message = next_message
+		fallback_text = ""
+		queue_redraw()
+
+	func set_fallback_text(text: String) -> void:
+		fallback_text = text
+		message = text
+		queue_redraw()
+
+	func _draw() -> void:
+		var rect := Rect2(Vector2.ZERO, size)
+		var panel := _make_style(Color(0.015, 0.018, 0.028, 0.84), Color(0.15, 0.95, 1.0, 0.48), 24)
+		draw_style_box(panel, rect)
+		draw_rect(Rect2(Vector2(24.0, 12.0), Vector2(size.x - 48.0, 2.0)), Color(0.15, 0.95, 1.0, 0.75), true)
+		draw_rect(Rect2(Vector2(24.0, size.y - 15.0), Vector2(size.x - 48.0, 2.0)), Color(1.0, 0.78, 0.12, 0.58), true)
+		draw_circle(Vector2(25.0, 25.0), 5.0, Color(1.0, 0.78, 0.12, 0.95))
+		draw_circle(Vector2(size.x - 25.0, 25.0), 5.0, Color(0.15, 0.95, 1.0, 0.95))
+
+		var font := get_theme_default_font()
+		var effectiveness := 0.0 if attempts == 0 else float(goals) / float(attempts)
+		var percent_text := "%d%%" % roundi(effectiveness * 100.0)
+		var ratio_text := "%d/%d" % [goals, attempts]
+
+		_draw_chip(font, Rect2(Vector2(26.0, 30.0), Vector2(158.0, 58.0)), "LEVEL", "%02d" % level, Color(0.15, 0.95, 1.0, 1.0))
+		_draw_chip(font, Rect2(Vector2(202.0, 30.0), Vector2(274.0, 58.0)), "EFFECTIVENESS", "%s · %s" % [percent_text, ratio_text], Color(0.56, 1.0, 0.38, 1.0))
+		_draw_miss_chip(font, Rect2(Vector2(494.0, 30.0), Vector2(180.0, 58.0)))
+
+		if message != "":
+			draw_string(font, Vector2(28.0, 112.0), message.to_upper(), HORIZONTAL_ALIGNMENT_CENTER, size.x - 56.0, 14, Color(1.0, 1.0, 1.0, 0.68))
+
+	func _draw_chip(font: Font, rect: Rect2, caption: String, value: String, accent: Color) -> void:
+		draw_style_box(_make_style(Color(1.0, 1.0, 1.0, 0.095), Color(1.0, 1.0, 1.0, 0.18), 15), rect)
+		draw_rect(Rect2(rect.position + Vector2(12.0, rect.size.y - 8.0), Vector2(rect.size.x - 24.0, 2.0)), accent.darkened(0.12), true)
+		draw_string(font, rect.position + Vector2(16.0, 19.0), caption, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 32.0, 11, Color(1.0, 1.0, 1.0, 0.50))
+		draw_string(font, rect.position + Vector2(16.0, 45.0), value, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 32.0, 24, accent)
+
+	func _draw_miss_chip(font: Font, rect: Rect2) -> void:
+		draw_style_box(_make_style(Color(1.0, 1.0, 1.0, 0.095), Color(1.0, 1.0, 1.0, 0.18), 15), rect)
+		draw_string(font, rect.position + Vector2(16.0, 19.0), "MISSES", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 32.0, 11, Color(1.0, 1.0, 1.0, 0.50))
+		for i in range(max_misses):
+			var center := rect.position + Vector2(26.0 + float(i) * 34.0, 40.0)
+			var used := i < misses
+			var fill := Color(1.0, 0.20, 0.14, 1.0) if used else Color(0.15, 0.95, 1.0, 0.16)
+			var stroke := Color(1.0, 0.78, 0.12, 0.95) if used else Color(0.15, 0.95, 1.0, 0.40)
+			draw_circle(center, 10.0, fill)
+			draw_arc(center, 10.0, 0.0, TAU, 28, stroke, 2.0)
+		draw_string(font, rect.position + Vector2(126.0, 46.0), "%d/%d" % [misses, max_misses], HORIZONTAL_ALIGNMENT_LEFT, 38.0, 16, Color(1.0, 1.0, 1.0, 0.68))
+
+	func _make_style(bg: Color, border: Color, radius: int) -> StyleBoxFlat:
+		var style := StyleBoxFlat.new()
+		style.bg_color = bg
+		style.border_color = border
+		style.border_width_left = 1
+		style.border_width_top = 1
+		style.border_width_right = 1
+		style.border_width_bottom = 1
+		style.corner_radius_top_left = radius
+		style.corner_radius_top_right = radius
+		style.corner_radius_bottom_left = radius
+		style.corner_radius_bottom_right = radius
+		return style
+
 @onready var power_label: Label = %PowerLabel
 @onready var power_bar: ProgressBar = %PowerBar
 @onready var power_meter: Control = %PowerMeterPanel
@@ -16,7 +95,7 @@ signal next_spot_requested
 @onready var feedback_label: Label = %FeedbackLabel
 @onready var instruction_label: Label = %InstructionLabel
 @onready var status_label: Label = %StatusLabel
-@onready var score_label: Label = _create_score_label()
+@onready var score_hud: Control = _create_score_hud()
 @onready var restart_button: Button = %RestartButton
 @onready var switch_foot_button: Button = %SwitchFootButton
 @onready var next_spot_button: Button = %NextSpotButton
@@ -37,6 +116,7 @@ func _ready() -> void:
 	support_zone_overlay = _create_support_zone_overlay()
 	support_marker_hint = _create_support_marker_hint()
 	_apply_mvp_layout()
+	_center_score_hud()
 	restart_button.pressed.connect(func() -> void: restart_requested.emit())
 	switch_foot_button.pressed.connect(func() -> void: switch_foot_requested.emit())
 	next_spot_button.pressed.connect(func() -> void: next_spot_requested.emit())
@@ -64,8 +144,12 @@ func set_spot_label(label: String) -> void:
 		next_spot_button.text = "Spot: %s" % label
 
 func set_scoreboard(text: String) -> void:
-	if score_label != null:
-		score_label.text = text
+	if score_hud != null and score_hud.has_method("set_fallback_text"):
+		score_hud.call("set_fallback_text", text)
+
+func set_run_hud(level: int, goals: int, attempts: int, misses: int, max_misses: int, message: String = "") -> void:
+	if score_hud != null and score_hud.has_method("set_stats"):
+		score_hud.call("set_stats", level, goals, attempts, misses, max_misses, message)
 
 func _create_support_zone_overlay() -> Control:
 	var root := get_node_or_null("Root") as Control
@@ -137,22 +221,25 @@ func _create_support_marker_hint() -> Control:
 		add_child(marker)
 	return marker
 
-func _create_score_label() -> Label:
+func _create_score_hud() -> Control:
 	var root := get_node_or_null("Root") as Control
-	var label := Label.new()
-	label.name = "ScoreLabel"
-	label.position = Vector2(760.0, 20.0)
-	label.size = Vector2(420.0, 70.0)
-	label.text = "SPOT 1/7  ·  GOALS 0  ·  ATTEMPTS 0\nCenter 24m  ·  THIS SPOT 0"
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.add_theme_font_size_override("font_size", 13)
-	label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.66))
+	var hud := ModernScoreHud.new()
+	hud.name = "ModernScoreHud"
+	hud.size = Vector2(700.0, 132.0)
+	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if root != null:
-		root.add_child(label)
+		root.add_child(hud)
 	else:
-		add_child(label)
-	return label
+		add_child(hud)
+	return hud
+
+func _center_score_hud() -> void:
+	if score_hud == null:
+		return
+	var viewport_size := get_viewport().get_visible_rect().size
+	if viewport_size.x <= 0.0:
+		viewport_size = Vector2(1280.0, 720.0)
+	score_hud.position = Vector2((viewport_size.x - score_hud.size.x) * 0.5, 18.0)
 
 func set_kicking_foot(foot: String) -> void:
 	kicking_foot = foot
@@ -235,7 +322,7 @@ func update_support_foot_angle(angle: float, aim_target: float = 0.0) -> void:
 
 func show_ball_contact_ui() -> void:
 	hide_all()
-	power_label.visible = true
+	power_label.visible = false
 	ball_panel.visible = true
 	ball_panel.modulate = Color(1.0, 1.0, 1.0, 0.92)
 	ball_panel.clear_swipe()

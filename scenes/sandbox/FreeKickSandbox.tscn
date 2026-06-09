@@ -1,4 +1,4 @@
-[gd_scene load_steps=48 format=3]
+[gd_scene load_steps=49 format=3]
 
 [ext_resource type="Script" path="res://scripts/state_machine/FreeKickSandbox.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/free_kick/Ball3D.tscn" id="2"]
@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" path="res://assets/models/goal.glb" id="4"]
 [ext_resource type="PackedScene" path="res://assets/models/goalkeeper.glb" id="5"]
 [ext_resource type="Script" path="res://scripts/sandbox/GoalTrigger3D.gd" id="6"]
+[ext_resource type="Script" path="res://scripts/sandbox/GoalNetVisual3D.gd" id="7_goal_net_visual"]
 [ext_resource type="Texture2D" path="res://assets/Cesped.png" id="7_grass"]
 [ext_resource type="Script" path="res://scripts/sandbox/FootballFieldMarkings3D.gd" id="8_field_markings"]
 [ext_resource type="Texture2D" path="res://assets/Tribuna.png" id="9_tribuna"]
@@ -155,7 +156,7 @@ size = Vector3(7.52, 0.12, 1.35)
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 1
-background_color = Color(0.07, 0.13, 0.1, 1)
+background_color = Color(0.11, 0.18, 0.14, 1)
 
 [node name="FreeKickSandbox" type="Node3D"]
 script = ExtResource("1")
@@ -165,14 +166,15 @@ environment = SubResource("Environment_1")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.866025, -0.353553, 0.353553, 0, 0.707107, 0.707107, -0.5, -0.612372, 0.612372, 0, 8, 0)
-light_energy = 0.45
+light_energy = 0.8
+light_indirect_energy = 0.65
 
 [node name="StadiumLighting" type="Node3D" parent="."]
 
 [node name="GoalFloodLeft" type="SpotLight3D" parent="StadiumLighting"]
 transform = Transform3D(0.99863, -0.026823, 0.045319, 0, 0.860155, 0.510033, -0.052336, -0.509334, 0.858977, -22, 18, -57)
-light_energy = 9.0
-light_indirect_energy = 0.45
+light_energy = 13.5
+light_indirect_energy = 0.7
 spot_range = 68.0
 spot_angle = 34.0
 spot_angle_attenuation = 0.65
@@ -180,8 +182,8 @@ shadow_enabled = true
 
 [node name="GoalFloodCenter" type="SpotLight3D" parent="StadiumLighting"]
 transform = Transform3D(1, 0, 0, 0, 0.866025, 0.5, 0, -0.5, 0.866025, 0, 19, -58)
-light_energy = 10.5
-light_indirect_energy = 0.5
+light_energy = 15.0
+light_indirect_energy = 0.75
 spot_range = 72.0
 spot_angle = 38.0
 spot_angle_attenuation = 0.62
@@ -189,8 +191,8 @@ shadow_enabled = true
 
 [node name="GoalFloodRight" type="SpotLight3D" parent="StadiumLighting"]
 transform = Transform3D(0.99863, 0.026823, -0.045319, 0, 0.860155, 0.510033, 0.052336, -0.509334, 0.858977, 22, 18, -57)
-light_energy = 9.0
-light_indirect_energy = 0.45
+light_energy = 13.5
+light_indirect_energy = 0.7
 spot_range = 68.0
 spot_angle = 34.0
 spot_angle_attenuation = 0.65
@@ -198,24 +200,24 @@ shadow_enabled = true
 
 [node name="LeftTouchlineFlood" type="SpotLight3D" parent="StadiumLighting"]
 transform = Transform3D(0, -0.819152, 0.573576, 0, 0.573576, 0.819152, -1, 0, 0, -38, 16, -10)
-light_energy = 5.5
-light_indirect_energy = 0.35
+light_energy = 8.0
+light_indirect_energy = 0.55
 spot_range = 55.0
 spot_angle = 42.0
 spot_angle_attenuation = 0.7
 
 [node name="RightTouchlineFlood" type="SpotLight3D" parent="StadiumLighting"]
 transform = Transform3D(0, 0.819152, -0.573576, 0, 0.573576, 0.819152, 1, 0, 0, 38, 16, -10)
-light_energy = 5.5
-light_indirect_energy = 0.35
+light_energy = 8.0
+light_indirect_energy = 0.55
 spot_range = 55.0
 spot_angle = 42.0
 spot_angle_attenuation = 0.7
 
 [node name="PitchFill" type="OmniLight3D" parent="StadiumLighting"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6.5, -18)
-light_energy = 0.85
-light_indirect_energy = 0.25
+light_energy = 1.6
+light_indirect_energy = 0.45
 omni_range = 58.0
 
 [node name="TestPitch" type="StaticBody3D" parent="."]
@@ -293,6 +295,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.16, 0)
 [node name="Goal" parent="." instance=ExtResource("4")]
 transform = Transform3D(1.02732, 0, 0, 0, 1.02459, 0, 0, 0, 1, 0, 0, -52.5)
 
+[node name="GoalNetVisual" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -52.5)
+script = ExtResource("7_goal_net_visual")
+
 [node name="Goalkeeper" parent="." instance=ExtResource("5")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -51.65)
 
@@ -329,6 +335,7 @@ shape = SubResource("SphereShape_keeper_hands")
 [node name="GoalTrigger" type="Area3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.22, -52.6)
 script = ExtResource("6")
+net_visual_path = NodePath("../GoalNetVisual")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="GoalTrigger"]
 shape = SubResource("BoxShape_goal_trigger")

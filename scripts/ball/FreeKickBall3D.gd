@@ -6,6 +6,7 @@ signal came_to_rest
 
 @export var rest_speed_threshold: float = 0.25
 @export var rest_time_required: float = 0.75
+@export_file("*.png") var ball_albedo_texture_path := "res://assets/trionda.png"
 
 var active_shot: ShotParams
 var _rest_time := 0.0
@@ -15,6 +16,27 @@ var _net_capture_active := false
 func _ready() -> void:
 	contact_monitor = true
 	max_contacts_reported = 8
+	_apply_ball_texture()
+
+func _apply_ball_texture() -> void:
+	var image := Image.load_from_file(ball_albedo_texture_path)
+	if image == null:
+		push_warning("Could not load ball texture: %s" % ball_albedo_texture_path)
+		return
+	var texture := ImageTexture.create_from_image(image)
+	var material := StandardMaterial3D.new()
+	material.albedo_texture = texture
+	material.roughness = 0.42
+	material.metallic = 0.0
+	material.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
+	_apply_material_to_meshes(self, material)
+
+func _apply_material_to_meshes(node: Node, material: Material) -> void:
+	if node is MeshInstance3D:
+		var mesh_instance := node as MeshInstance3D
+		mesh_instance.material_override = material
+	for child in node.get_children():
+		_apply_material_to_meshes(child, material)
 
 func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	if aerodynamics != null:

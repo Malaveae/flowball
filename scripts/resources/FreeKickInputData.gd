@@ -10,6 +10,8 @@ extends Resource
 @export_range(-1.0, 1.0, 0.001) var plant_depth: float = 0.0
 @export var support_foot_angle: float = 0.0 # radians, visual foot line from plant point to target.
 @export_range(-1.0, 1.0, 0.001) var support_aim_target: float = 0.0 # -1 left post, 0 center, +1 right post.
+@export_range(0.0, 1.0, 0.001) var support_quality: float = 1.0
+@export_range(-1.0, 1.0, 0.001) var support_angle_quality: float = 1.0
 @export var support_timer_expired: bool = false
 @export var used_default_support: bool = false
 
@@ -28,6 +30,8 @@ func reset() -> void:
 	plant_depth = 0.0
 	support_foot_angle = 0.0
 	support_aim_target = 0.0
+	support_quality = 1.0
+	support_angle_quality = 1.0
 	support_timer_expired = false
 	used_default_support = false
 	impact_point = Vector2.ZERO

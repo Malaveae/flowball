@@ -16,6 +16,7 @@ mass = 0.43
 continuous_cd = true
 physics_material_override = SubResource("PhysicsMaterial_ball")
 script = ExtResource("1")
+ball_albedo_texture_path = "res://assets/trionda.png"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("SphereShape3D_1")

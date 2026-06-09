@@ -35,18 +35,23 @@ def cube(name, location, scale, material):
     obj.data.materials.append(material)
     return obj
 
-def cylinder_between(name, start, end, radius, material):
+def cylinder_between(name, start, end, radius, material, vertices=16):
     start_v = mathutils.Vector(start)
     end_v = mathutils.Vector(end)
     mid = (start_v + end_v) * 0.5
     direction = end_v - start_v
     length = direction.length
-    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=radius, depth=length, location=mid)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=vertices, radius=radius, depth=length, location=mid)
     obj = bpy.context.object
     obj.name = name
     obj.rotation_euler = direction.to_track_quat("Z", "Y").to_euler()
     obj.data.materials.append(material)
     return obj
+
+
+def net_cord(name, points, radius, material):
+    for idx in range(len(points) - 1):
+        cylinder_between(f"{name}_{idx:02d}", points[idx], points[idx + 1], radius, material, 10)
 
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -78,14 +83,8 @@ cylinder_between("LeftBackSupport", (-post_center_x, 0, crossbar_center_height),
 cylinder_between("RightBackSupport", (post_center_x, 0, crossbar_center_height), (post_center_x, depth, 0.08), post_r * 0.65, white)
 cylinder_between("BackBottom", (-post_center_x, depth, 0.08), (post_center_x, depth, 0.08), post_r * 0.55, white)
 
-# Net grid.
-for i in range(9):
-    x = -inside_w / 2.0 + (inside_w / 8.0) * i
-    cylinder_between(f"NetVertical_{i}", (x, depth, 0.12), (x, 0, crossbar_lower_height), 0.008, net)
-for j in range(5):
-    z = 0.18 + ((crossbar_lower_height - 0.18) / 4.0) * j
-    y = depth * (1.0 - z / crossbar_lower_height * 0.35)
-    cylinder_between(f"NetHorizontal_{j}", (-inside_w / 2.0, y, z), (inside_w / 2.0, y, z), 0.008, net)
+# Visual net is authored in Godot by GoalNetVisual3D so it can react to goals.
+# Keep this GLB as frame-only: posts, rear supports, and bottom support.
 
 bpy.ops.export_scene.gltf(filepath=str(GOAL_OUT), export_format="GLB", export_apply=True, export_materials="EXPORT")
 print(f"Exported {GOAL_OUT}")

@@ -17,6 +17,15 @@ class ModernScoreHud:
 	var max_misses := 3
 	var message := ""
 	var fallback_text := ""
+	var _pulse := 0.0
+
+	func _ready() -> void:
+		process_mode = Node.PROCESS_MODE_ALWAYS
+		set_process(true)
+
+	func _process(delta: float) -> void:
+		_pulse += delta
+		queue_redraw()
 
 	func set_stats(next_level: int, next_goals: int, next_attempts: int, next_misses: int, next_max_misses: int, next_message: String = "") -> void:
 		level = max(1, next_level)
@@ -35,56 +44,91 @@ class ModernScoreHud:
 
 	func _draw() -> void:
 		var rect := Rect2(Vector2.ZERO, size)
-		var panel := _make_style(Color(0.015, 0.018, 0.028, 0.84), Color(0.15, 0.95, 1.0, 0.48), 24)
-		draw_style_box(panel, rect)
-		draw_rect(Rect2(Vector2(24.0, 12.0), Vector2(size.x - 48.0, 2.0)), Color(0.15, 0.95, 1.0, 0.75), true)
-		draw_rect(Rect2(Vector2(24.0, size.y - 15.0), Vector2(size.x - 48.0, 2.0)), Color(1.0, 0.78, 0.12, 0.58), true)
-		draw_circle(Vector2(25.0, 25.0), 5.0, Color(1.0, 0.78, 0.12, 0.95))
-		draw_circle(Vector2(size.x - 25.0, 25.0), 5.0, Color(0.15, 0.95, 1.0, 0.95))
-
 		var font := get_theme_default_font()
+		var glow := 0.55 + sin(_pulse * 2.4) * 0.16
+		_draw_stadium_glass(rect, glow)
+
+		var left_rect := Rect2(Vector2(46.0, 29.0), Vector2(238.0, 104.0))
+		var center_rect := Rect2(Vector2(330.0, 29.0), Vector2(340.0, 104.0))
+		var right_rect := Rect2(Vector2(728.0, 29.0), Vector2(248.0, 104.0))
+		_draw_divider(Vector2(304.0, 26.0), Vector2(286.0, 136.0))
+		_draw_divider(Vector2(705.0, 26.0), Vector2(723.0, 136.0))
+
 		var effectiveness := 0.0 if attempts == 0 else float(goals) / float(attempts)
-		var percent_text := "%d%%" % roundi(effectiveness * 100.0)
-		var ratio_text := "%d/%d" % [goals, attempts]
+		_draw_level(font, left_rect)
+		_draw_effectiveness(font, center_rect, effectiveness)
+		_draw_misses(font, right_rect)
 
-		_draw_chip(font, Rect2(Vector2(26.0, 30.0), Vector2(158.0, 58.0)), "LEVEL", "%02d" % level, Color(0.15, 0.95, 1.0, 1.0))
-		_draw_chip(font, Rect2(Vector2(202.0, 30.0), Vector2(274.0, 58.0)), "EFFECTIVENESS", "%s · %s" % [percent_text, ratio_text], Color(0.56, 1.0, 0.38, 1.0))
-		_draw_miss_chip(font, Rect2(Vector2(494.0, 30.0), Vector2(180.0, 58.0)))
+		var footer := "MARCAR UN GOL AL MENOS EN 3 INTENTOS" if message == "" else message.to_upper()
+		draw_string(font, Vector2(0.0, 156.0), footer, HORIZONTAL_ALIGNMENT_CENTER, size.x, 17, Color(0.04, 0.86, 1.0, 0.95))
 
-		if message != "":
-			draw_string(font, Vector2(28.0, 112.0), message.to_upper(), HORIZONTAL_ALIGNMENT_CENTER, size.x - 56.0, 14, Color(1.0, 1.0, 1.0, 0.68))
+	func _draw_stadium_glass(rect: Rect2, glow: float) -> void:
+		var poly := PackedVector2Array([
+			Vector2(34.0, 0.0), Vector2(size.x - 34.0, 0.0), Vector2(size.x - 8.0, 8.0),
+			Vector2(size.x, 28.0), Vector2(size.x, 122.0), Vector2(size.x - 16.0, 146.0),
+			Vector2(size.x - 56.0, 162.0), Vector2(size.x - 312.0, 162.0), Vector2(size.x - 340.0, 180.0),
+			Vector2(340.0, 180.0), Vector2(312.0, 162.0), Vector2(56.0, 162.0),
+			Vector2(16.0, 146.0), Vector2(0.0, 122.0), Vector2(0.0, 28.0), Vector2(8.0, 8.0)
+		])
+		draw_colored_polygon(poly, Color(0.0, 0.008, 0.018, 0.78))
+		draw_polyline(poly + PackedVector2Array([poly[0]]), Color(0.08, 0.82, 1.0, glow), 2.4, true)
+		draw_polyline(PackedVector2Array([Vector2(28.0, 4.0), Vector2(174.0, 4.0), Vector2(188.0, 10.0)]), Color(0.0, 0.95, 1.0, 0.95), 3.0, true)
+		draw_polyline(PackedVector2Array([Vector2(size.x - 188.0, 10.0), Vector2(size.x - 174.0, 4.0), Vector2(size.x - 28.0, 4.0)]), Color(0.0, 0.95, 1.0, 0.95), 3.0, true)
+		draw_rect(Rect2(Vector2(56.0, 14.0), Vector2(size.x - 112.0, 1.0)), Color(0.55, 0.95, 1.0, 0.18), true)
+		draw_rect(Rect2(Vector2(70.0, 132.0), Vector2(size.x - 140.0, 1.0)), Color(1.0, 1.0, 1.0, 0.10), true)
 
-	func _draw_chip(font: Font, rect: Rect2, caption: String, value: String, accent: Color) -> void:
-		draw_style_box(_make_style(Color(1.0, 1.0, 1.0, 0.095), Color(1.0, 1.0, 1.0, 0.18), 15), rect)
-		draw_rect(Rect2(rect.position + Vector2(12.0, rect.size.y - 8.0), Vector2(rect.size.x - 24.0, 2.0)), accent.darkened(0.12), true)
-		draw_string(font, rect.position + Vector2(16.0, 19.0), caption, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 32.0, 11, Color(1.0, 1.0, 1.0, 0.50))
-		draw_string(font, rect.position + Vector2(16.0, 45.0), value, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 32.0, 24, accent)
+	func _draw_divider(a: Vector2, b: Vector2) -> void:
+		draw_line(a, b, Color(1.0, 1.0, 1.0, 0.18), 1.8)
+		draw_line(a + Vector2(2.0, 0.0), b + Vector2(2.0, 0.0), Color(0.0, 0.7, 1.0, 0.10), 1.0)
 
-	func _draw_miss_chip(font: Font, rect: Rect2) -> void:
-		draw_style_box(_make_style(Color(1.0, 1.0, 1.0, 0.095), Color(1.0, 1.0, 1.0, 0.18), 15), rect)
-		draw_string(font, rect.position + Vector2(16.0, 19.0), "MISSES", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 32.0, 11, Color(1.0, 1.0, 1.0, 0.50))
+	func _draw_level(font: Font, rect: Rect2) -> void:
+		draw_string(font, rect.position + Vector2(0.0, 21.0), "NIVEL", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 17, Color(1.0, 1.0, 1.0, 0.88))
+		draw_string(font, rect.position + Vector2(0.0, 74.0), "%02d" % level, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 43, Color(0.08, 0.84, 1.0, 1.0))
+		_draw_progress_bar(Rect2(rect.position + Vector2(0.0, 93.0), Vector2(210.0, 10.0)), clampf(float(level % 5) / 5.0, 0.18, 1.0), Color(0.04, 0.83, 1.0, 1.0))
+
+	func _draw_effectiveness(font: Font, rect: Rect2, effectiveness: float) -> void:
+		draw_string(font, rect.position + Vector2(0.0, 21.0), "EFECTIVIDAD", HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 17, Color(1.0, 1.0, 1.0, 0.88))
+		var pct := "%d%%" % roundi(effectiveness * 100.0)
+		var ratio := "%d/%d" % [goals, max(1, attempts)]
+		draw_string(font, rect.position + Vector2(0.0, 74.0), pct, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x * 0.48, 43, Color(0.62, 1.0, 0.16, 1.0))
+		draw_circle(rect.position + Vector2(rect.size.x * 0.50, 55.0), 4.0, Color(0.62, 1.0, 0.16, 1.0))
+		draw_string(font, rect.position + Vector2(rect.size.x * 0.58, 74.0), ratio, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x * 0.42, 43, Color(1.0, 1.0, 1.0, 0.92))
+		_draw_progress_bar(Rect2(rect.position + Vector2(0.0, 93.0), Vector2(rect.size.x, 10.0)), effectiveness, Color(0.62, 1.0, 0.16, 1.0))
+
+	func _draw_misses(font: Font, rect: Rect2) -> void:
+		draw_string(font, rect.position + Vector2(0.0, 21.0), "FALLOS", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 17, Color(1.0, 1.0, 1.0, 0.88))
 		for i in range(max_misses):
-			var center := rect.position + Vector2(26.0 + float(i) * 34.0, 40.0)
+			var center := rect.position + Vector2(24.0 + float(i) * 48.0, 59.0)
 			var used := i < misses
-			var fill := Color(1.0, 0.20, 0.14, 1.0) if used else Color(0.15, 0.95, 1.0, 0.16)
-			var stroke := Color(1.0, 0.78, 0.12, 0.95) if used else Color(0.15, 0.95, 1.0, 0.40)
-			draw_circle(center, 10.0, fill)
-			draw_arc(center, 10.0, 0.0, TAU, 28, stroke, 2.0)
-		draw_string(font, rect.position + Vector2(126.0, 46.0), "%d/%d" % [misses, max_misses], HORIZONTAL_ALIGNMENT_LEFT, 38.0, 16, Color(1.0, 1.0, 1.0, 0.68))
+			var fill := Color(1.0, 0.08, 0.04, 0.88) if used else Color(0.0, 0.0, 0.0, 0.20)
+			var stroke := Color(1.0, 0.14, 0.08, 1.0) if used else Color(1.0, 1.0, 1.0, 0.55)
+			draw_circle(center, 17.0, fill)
+			draw_arc(center, 17.0, 0.0, TAU, 48, stroke, 2.2)
+			if used:
+				draw_arc(center, 23.0, 0.0, TAU, 48, Color(1.0, 0.08, 0.04, 0.26), 5.0)
+		draw_string(font, rect.position + Vector2(174.0, 67.0), "%d / %d" % [misses, max_misses], HORIZONTAL_ALIGNMENT_LEFT, 74.0, 27, Color(1.0, 1.0, 1.0, 0.92))
 
-	func _make_style(bg: Color, border: Color, radius: int) -> StyleBoxFlat:
-		var style := StyleBoxFlat.new()
-		style.bg_color = bg
-		style.border_color = border
-		style.border_width_left = 1
-		style.border_width_top = 1
-		style.border_width_right = 1
-		style.border_width_bottom = 1
-		style.corner_radius_top_left = radius
-		style.corner_radius_top_right = radius
-		style.corner_radius_bottom_left = radius
-		style.corner_radius_bottom_right = radius
-		return style
+	func _draw_progress_bar(rect: Rect2, value: float, accent: Color) -> void:
+		var bg := StyleBoxFlat.new()
+		bg.bg_color = Color(0.65, 0.78, 0.86, 0.16)
+		bg.border_color = Color(1.0, 1.0, 1.0, 0.24)
+		bg.border_width_left = 1
+		bg.border_width_top = 1
+		bg.border_width_right = 1
+		bg.border_width_bottom = 1
+		bg.corner_radius_top_left = 5
+		bg.corner_radius_top_right = 5
+		bg.corner_radius_bottom_left = 5
+		bg.corner_radius_bottom_right = 5
+		draw_style_box(bg, rect)
+		var fill_rect := Rect2(rect.position + Vector2(1.0, 1.0), Vector2(maxf(4.0, (rect.size.x - 2.0) * clampf(value, 0.0, 1.0)), rect.size.y - 2.0))
+		var fill := StyleBoxFlat.new()
+		fill.bg_color = accent
+		fill.corner_radius_top_left = 4
+		fill.corner_radius_top_right = 4
+		fill.corner_radius_bottom_left = 4
+		fill.corner_radius_bottom_right = 4
+		draw_style_box(fill, fill_rect)
 
 @onready var power_label: Label = %PowerLabel
 @onready var power_bar: ProgressBar = %PowerBar
@@ -225,7 +269,8 @@ func _create_score_hud() -> Control:
 	var root := get_node_or_null("Root") as Control
 	var hud := ModernScoreHud.new()
 	hud.name = "ModernScoreHud"
-	hud.size = Vector2(700.0, 132.0)
+	hud.size = Vector2(980.0, 180.0)
+	hud.scale = Vector2(0.88, 0.88)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if root != null:
 		root.add_child(hud)
@@ -239,7 +284,8 @@ func _center_score_hud() -> void:
 	var viewport_size := get_viewport().get_visible_rect().size
 	if viewport_size.x <= 0.0:
 		viewport_size = Vector2(1280.0, 720.0)
-	score_hud.position = Vector2((viewport_size.x - score_hud.size.x) * 0.5, 18.0)
+	var visual_size := score_hud.size * score_hud.scale
+	score_hud.position = Vector2((viewport_size.x - visual_size.x) * 0.5, 20.0)
 
 func set_kicking_foot(foot: String) -> void:
 	kicking_foot = foot

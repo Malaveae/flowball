@@ -4,7 +4,7 @@
 [ext_resource type="PackedScene" path="res://scenes/free_kick/Ball3D.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://scenes/free_kick/FreeKickController.tscn" id="3"]
 [ext_resource type="PackedScene" path="res://assets/models/goal.glb" id="4"]
-[ext_resource type="PackedScene" path="res://assets/models/goalkeeper.glb" id="5"]
+[ext_resource type="PackedScene" path="res://scenes/actors/Goalkeeper.tscn" id="5"]
 [ext_resource type="Script" path="res://scripts/sandbox/GoalTrigger3D.gd" id="6"]
 [ext_resource type="Script" path="res://scripts/sandbox/GoalNetVisual3D.gd" id="7_goal_net_visual"]
 [ext_resource type="Texture2D" path="res://assets/Cesped.png" id="7_grass"]
@@ -19,8 +19,9 @@ albedo_texture = ExtResource("10_grass_albedo")
 roughness_texture = ExtResource("12_grass_roughness")
 normal_enabled = true
 normal_texture = ExtResource("11_grass_normal")
-uv1_scale = Vector3(28, 42, 1)
-roughness = 0.82
+uv1_scale = Vector3(42, 64, 1)
+roughness = 0.9
+normal_scale = 1.35
 
 [sub_resource type="BoxMesh" id="BoxMesh_pitch"]
 material = SubResource("StandardMaterial3D_pitch_grass")
@@ -316,21 +317,6 @@ shape = SubResource("BoxShape_goal_post")
 [node name="CrossbarCollision" type="CollisionShape3D" parent="GoalCollision"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.52, -52.5)
 shape = SubResource("BoxShape_goal_crossbar")
-
-[node name="GoalkeeperCollision" type="StaticBody3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, -51.65)
-physics_material_override = SubResource("PhysicsMaterial_keeper")
-
-[node name="BodyCollision" type="CollisionShape3D" parent="GoalkeeperCollision"]
-shape = SubResource("CapsuleShape_keeper_body")
-
-[node name="LeftHandCollision" type="CollisionShape3D" parent="GoalkeeperCollision"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.48, 0.28, -0.03)
-shape = SubResource("SphereShape_keeper_hands")
-
-[node name="RightHandCollision" type="CollisionShape3D" parent="GoalkeeperCollision"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.48, 0.28, -0.03)
-shape = SubResource("SphereShape_keeper_hands")
 
 [node name="GoalTrigger" type="Area3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.22, -52.6)

@@ -1,6 +1,7 @@
 extends Node3D
 
 @onready var controller: FreeKickController = $FreeKickController
+@onready var goalkeeper: Node = get_node_or_null("Goalkeeper")
 
 const WALL_DISTANCE_FROM_BALL := 9.15
 const DEFAULT_WALL_PLAYER_COUNT := 5
@@ -71,6 +72,9 @@ func _start_attempt(selected_foot: String) -> void:
 	current_spot_attempts += 1
 	total_attempts += 1
 	current_spot_goal_scored = false
+	if goalkeeper != null:
+		goalkeeper.call("reset_for_free_kick")
+		goalkeeper.call("set_ready")
 	controller.start_free_kick(selected_foot)
 	_update_scoreboard()
 
@@ -98,13 +102,17 @@ func _on_goal_scored() -> void:
 	_advance_to_next_set_piece()
 	_start_attempt(controller.input_data.selected_foot)
 
-func _on_shot_calculated(_shot_params: ShotParams) -> void:
+func _on_shot_calculated(shot_params: ShotParams) -> void:
 	_trigger_wall_jump_reactions()
+	if goalkeeper != null:
+		goalkeeper.call("react_to_shot", shot_params, _predict_target_at_goal(shot_params))
 
 func _on_free_kick_finished(report: Resource) -> void:
 	if game_over or current_spot_goal_scored:
 		return
 	if report != null and report.get("outcome") == &"goal":
+		if goalkeeper != null:
+			goalkeeper.call("play_goal_conceded_reaction")
 		return
 	current_spot_misses = mini(current_spot_misses + 1, MAX_TRIALS_PER_SET_PIECE)
 	_update_scoreboard()
@@ -197,6 +205,23 @@ func _wall_physics_material() -> PhysicsMaterial:
 	material.friction = 0.7
 	material.bounce = 0.12
 	return material
+
+func _predict_target_at_goal(shot_params: ShotParams) -> Vector3:
+	if shot_params == null:
+		return GOAL_CENTER
+	var ball := controller.get_ball()
+	var origin := Vector3.ZERO if ball == null else ball.global_position
+	var velocity := shot_params.launch_velocity
+	if absf(velocity.z) < 0.001:
+		return GOAL_CENTER
+	var time_to_goal_plane := (GOAL_CENTER.z - origin.z) / velocity.z
+	if time_to_goal_plane < 0.0:
+		return GOAL_CENTER
+	var gravity := ProjectSettings.get_setting("physics/3d/default_gravity") as float
+	var predicted := origin + velocity * time_to_goal_plane
+	predicted.y -= 0.5 * gravity * time_to_goal_plane * time_to_goal_plane
+	predicted.z = GOAL_CENTER.z
+	return predicted
 
 func _position_wall_dummies(ball_position: Vector3, active_wall_count: int = DEFAULT_WALL_PLAYER_COUNT) -> void:
 	if wall_root == null:

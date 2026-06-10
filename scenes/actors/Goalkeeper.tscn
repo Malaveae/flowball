@@ -1,0 +1,37 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/actors/GoalkeeperController.gd" id="1_goalkeeper_controller"]
+[ext_resource type="PackedScene" path="res://assets/models/goalkeeper_rigged.glb" id="2_goalkeeper_model"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape_body"]
+radius = 0.34
+height = 1.55
+
+[sub_resource type="BoxShape3D" id="BoxShape_reach"]
+size = Vector3(3.2, 2.1, 0.65)
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_placeholder"]
+
+[node name="Goalkeeper" type="CharacterBody3D"]
+script = ExtResource("1_goalkeeper_controller")
+animation_player_path = NodePath("Model/ImportedGoalkeeper/AnimationPlayer")
+
+[node name="Model" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="ImportedGoalkeeper" parent="Model" instance=ExtResource("2_goalkeeper_model")]
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+libraries = {
+"": SubResource("AnimationLibrary_placeholder")
+}
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.78, 0)
+shape = SubResource("CapsuleShape_body")
+
+[node name="SaveReachArea" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SaveReachArea"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.03, -0.1)
+shape = SubResource("BoxShape_reach")

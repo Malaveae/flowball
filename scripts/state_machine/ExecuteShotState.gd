@@ -64,6 +64,7 @@ func _is_feedback_contact_body(body: Node) -> bool:
 	var body_name := String(body.name)
 	return body_name == "TribunaBackground" \
 		or body_name == "GoalCollision" \
+		or body_name == "Goalkeeper" \
 		or body_name == "GoalkeeperCollision" \
 		or body_name == "GoalNetCollision" \
 		or body_name.begins_with("WallDummy")
@@ -72,7 +73,7 @@ func _outcome_for_contact_body(body: Node) -> StringName:
 	var body_name := String(body.name)
 	if body_name == "TribunaBackground":
 		return &"background_contact"
-	if body_name == "GoalkeeperCollision":
+	if body_name == "Goalkeeper" or body_name == "GoalkeeperCollision":
 		return &"keeper_contact"
 	if body_name.begins_with("WallDummy"):
 		return &"wall_contact"

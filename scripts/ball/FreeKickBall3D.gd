@@ -19,11 +19,10 @@ func _ready() -> void:
 	_apply_ball_texture()
 
 func _apply_ball_texture() -> void:
-	var image := Image.load_from_file(ball_albedo_texture_path)
-	if image == null:
+	var texture := load(ball_albedo_texture_path) as Texture2D
+	if texture == null:
 		push_warning("Could not load ball texture: %s" % ball_albedo_texture_path)
 		return
-	var texture := ImageTexture.create_from_image(image)
 	var material := StandardMaterial3D.new()
 	material.albedo_texture = texture
 	material.roughness = 0.42

@@ -179,7 +179,9 @@ func _test_spot_angle_is_not_double_counted() -> bool:
 	right_input.support_aim_target = 1.0
 	var center := ShotCalculator.calculate(center_input, _stats(), environment, _difficulty())
 	var right := ShotCalculator.calculate(right_input, _stats(), environment, _difficulty())
-	var passed := is_equal_approx(absf(right.horizontal_angle - center.horizontal_angle), 25.0)
+	# The spot angle is already represented by environment.base_goal_direction.
+	# horizontal_angle should only contain the support aim offset: full target lane = 11 degrees.
+	var passed := is_equal_approx(absf(right.horizontal_angle - center.horizontal_angle), 11.0)
 	_print_result("spot angle is not double-counted", passed)
 	return passed
 

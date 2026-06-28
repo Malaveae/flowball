@@ -147,10 +147,10 @@ func _draw_aim_meter(marker: Vector2, angle_dir: Vector2) -> void:
 	draw_string(get_theme_default_font(), meter_pos + Vector2(0, 29.0), "TARGET: %s" % label, HORIZONTAL_ALIGNMENT_CENTER, meter_width, 12, Color(1.0, 0.9, 0.35, 1.0))
 
 func _draw_header(center: Vector2, support_foot: String, font: Font) -> void:
-	draw_string(font, center + Vector2(-178.0, -sector_radius - 60.0), "STEP 2  ·  SUPPORT FOOT", HORIZONTAL_ALIGNMENT_LEFT, 420.0, 18, Color(1, 1, 1, 1))
+	draw_string(font, center + Vector2(-178.0, -sector_radius - 60.0), "STEP 2  -  SUPPORT FOOT", HORIZONTAL_ALIGNMENT_LEFT, 420.0, 18, Color(1, 1, 1, 1))
 	draw_string(font, center + Vector2(-178.0, -sector_radius - 36.0), substep_label.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, 440.0, 14, Color(1.0, 0.92, 0.3, 1.0))
 	draw_string(font, center + Vector2(-178.0, -sector_radius - 16.0), "%s foot plants beside the ball, then rotates subtly toward the target lane." % support_foot, HORIZONTAL_ALIGNMENT_LEFT, 540.0, 13, text_color)
 
 func _draw_footer(center: Vector2, support_foot: String, font: Font) -> void:
 	var legal_side := "LEFT" if support_foot == "LEFT" else "RIGHT"
-	draw_string(font, center + Vector2(-174.0, sector_radius + 18.0), "Allowed plant side: %s of ball  ·  Green ring = useful distance  ·  Yellow line = foot aim" % legal_side, HORIZONTAL_ALIGNMENT_LEFT, 600.0, 13, Color(1.0, 0.9, 0.45, 0.96))
+	draw_string(font, center + Vector2(-174.0, sector_radius + 18.0), "Allowed plant side: %s of ball  -  Green ring = useful distance  -  Yellow line = foot aim" % legal_side, HORIZONTAL_ALIGNMENT_LEFT, 600.0, 13, Color(1.0, 0.9, 0.45, 0.96))

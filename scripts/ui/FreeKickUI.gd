@@ -17,6 +17,7 @@ class ModernScoreHud:
 	var max_misses := 3
 	var message := ""
 	var fallback_text := ""
+	var active_step := 0
 	var _pulse := 0.0
 
 	func _ready() -> void:
@@ -42,6 +43,10 @@ class ModernScoreHud:
 		message = text
 		queue_redraw()
 
+	func set_active_step(step: int) -> void:
+		active_step = clampi(step, 0, 4)
+		queue_redraw()
+
 	func _draw() -> void:
 		var rect := Rect2(Vector2.ZERO, size)
 		var font := get_theme_default_font()
@@ -59,8 +64,9 @@ class ModernScoreHud:
 		_draw_effectiveness(font, center_rect, effectiveness)
 		_draw_misses(font, right_rect)
 
-		var footer := "MARCAR UN GOL AL MENOS EN 3 INTENTOS" if message == "" else message.to_upper()
-		draw_string(font, Vector2(0.0, 156.0), footer, HORIZONTAL_ALIGNMENT_CENTER, size.x, 17, Color(0.04, 0.86, 1.0, 0.95))
+		_draw_stepper(font)
+		var footer := "SCORE AT LEAST ONCE IN 3 TRIALS" if message == "" else message.to_upper()
+		draw_string(font, Vector2(0.0, 170.0), footer, HORIZONTAL_ALIGNMENT_CENTER, size.x, 14, Color(0.04, 0.86, 1.0, 0.95))
 
 	func _draw_stadium_glass(rect: Rect2, glow: float) -> void:
 		var poly := PackedVector2Array([
@@ -82,12 +88,12 @@ class ModernScoreHud:
 		draw_line(a + Vector2(2.0, 0.0), b + Vector2(2.0, 0.0), Color(0.0, 0.7, 1.0, 0.10), 1.0)
 
 	func _draw_level(font: Font, rect: Rect2) -> void:
-		draw_string(font, rect.position + Vector2(0.0, 21.0), "NIVEL", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 17, Color(1.0, 1.0, 1.0, 0.88))
+		draw_string(font, rect.position + Vector2(0.0, 21.0), "SET PIECE", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 17, Color(1.0, 1.0, 1.0, 0.88))
 		draw_string(font, rect.position + Vector2(0.0, 74.0), "%02d" % level, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 43, Color(0.08, 0.84, 1.0, 1.0))
 		_draw_progress_bar(Rect2(rect.position + Vector2(0.0, 93.0), Vector2(210.0, 10.0)), clampf(float(level % 5) / 5.0, 0.18, 1.0), Color(0.04, 0.83, 1.0, 1.0))
 
 	func _draw_effectiveness(font: Font, rect: Rect2, effectiveness: float) -> void:
-		draw_string(font, rect.position + Vector2(0.0, 21.0), "EFECTIVIDAD", HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 17, Color(1.0, 1.0, 1.0, 0.88))
+		draw_string(font, rect.position + Vector2(0.0, 21.0), "CONVERSION", HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 17, Color(1.0, 1.0, 1.0, 0.88))
 		var pct := "%d%%" % roundi(effectiveness * 100.0)
 		var ratio := "%d/%d" % [goals, max(1, attempts)]
 		draw_string(font, rect.position + Vector2(0.0, 74.0), pct, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x * 0.48, 43, Color(0.62, 1.0, 0.16, 1.0))
@@ -96,7 +102,7 @@ class ModernScoreHud:
 		_draw_progress_bar(Rect2(rect.position + Vector2(0.0, 93.0), Vector2(rect.size.x, 10.0)), effectiveness, Color(0.62, 1.0, 0.16, 1.0))
 
 	func _draw_misses(font: Font, rect: Rect2) -> void:
-		draw_string(font, rect.position + Vector2(0.0, 21.0), "FALLOS", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 17, Color(1.0, 1.0, 1.0, 0.88))
+		draw_string(font, rect.position + Vector2(0.0, 21.0), "MISSES", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 17, Color(1.0, 1.0, 1.0, 0.88))
 		for i in range(max_misses):
 			var center := rect.position + Vector2(24.0 + float(i) * 48.0, 59.0)
 			var used := i < misses
@@ -129,6 +135,26 @@ class ModernScoreHud:
 		fill.corner_radius_bottom_left = 4
 		fill.corner_radius_bottom_right = 4
 		draw_style_box(fill, fill_rect)
+
+	func _draw_stepper(font: Font) -> void:
+		var labels := ["1 POWER", "2 PLANT", "3 CONTACT", "SHOT"]
+		var start_x := 204.0
+		var y := 142.0
+		var gap := 156.0
+		for i in range(labels.size()):
+			var step_index := i + 1
+			var center := Vector2(start_x + float(i) * gap, y)
+			var is_done := active_step > step_index
+			var is_active := active_step == step_index
+			var fill := Color(0.62, 1.0, 0.16, 0.92) if is_done else Color(0.04, 0.86, 1.0, 0.95) if is_active else Color(0.0, 0.0, 0.0, 0.30)
+			var stroke := Color(0.9, 1.0, 1.0, 0.95) if is_active else Color(1.0, 1.0, 1.0, 0.28)
+			draw_circle(center, 10.0, fill)
+			draw_arc(center, 10.0, 0.0, TAU, 32, stroke, 1.4)
+			if i < labels.size() - 1:
+				var next_center := Vector2(start_x + float(i + 1) * gap, y)
+				var line_color := Color(0.62, 1.0, 0.16, 0.72) if is_done else Color(1.0, 1.0, 1.0, 0.18)
+				draw_line(center + Vector2(14.0, 0.0), next_center - Vector2(14.0, 0.0), line_color, 2.0)
+			draw_string(font, center + Vector2(-50.0, 27.0), labels[i], HORIZONTAL_ALIGNMENT_CENTER, 100.0, 11, Color(1.0, 1.0, 1.0, 0.76))
 
 @onready var power_label: Label = %PowerLabel
 @onready var power_bar: ProgressBar = %PowerBar
@@ -183,6 +209,10 @@ func hide_all() -> void:
 	if support_zone_overlay != null:
 		support_zone_overlay.visible = false
 
+func _set_active_step(step: int) -> void:
+	if score_hud != null and score_hud.has_method("set_active_step"):
+		score_hud.call("set_active_step", step)
+
 func set_spot_label(label: String) -> void:
 	if next_spot_button != null:
 		next_spot_button.text = "Spot: %s" % label
@@ -231,7 +261,7 @@ func _create_support_zone_overlay() -> Control:
 				overlay.draw_circle(aim_end, 5.0, Color(1.0, 0.86, 0.22, 1.0))
 				_draw_support_foot_indicator(overlay, marker, true, aim_angle)
 		var side_text := "LEFT" if kicking_foot == "right" else "RIGHT"
-		overlay.draw_string(overlay.get_theme_default_font(), center + Vector2(-96.0, radius + 28.0), "Plant zone: %s side · drag then aim" % side_text, HORIZONTAL_ALIGNMENT_CENTER, 192.0, 13, Color(1, 1, 1, 0.7))
+		overlay.draw_string(overlay.get_theme_default_font(), center + Vector2(-96.0, radius + 28.0), "Plant zone: %s side - drag then aim" % side_text, HORIZONTAL_ALIGNMENT_CENTER, 192.0, 13, Color(1, 1, 1, 0.7))
 	)
 	if root != null:
 		root.add_child(overlay)
@@ -298,23 +328,24 @@ func _support_foot_for_kick(kicking_foot: String) -> String:
 
 func show_power_ready() -> void:
 	hide_all()
+	_set_active_step(1)
 	_position_power_meter_for_foot()
-	instruction_label.visible = true
-	instruction_label.text = "Touch left for left foot · touch right for right foot"
-	set_status("POWER · choose kicking foot by screen side")
+	_show_primary_instruction("Choose kicking foot", "Tap left or right side, then hold to charge power.")
+	set_status("POWER - choose kicking foot")
 
 func show_power(power_value: float) -> void:
+	_set_active_step(1)
 	_position_power_meter_for_foot()
 	power_label.visible = false
 	power_meter.visible = true
-	instruction_label.visible = true
-	instruction_label.text = "Hold · release at 70–85%"
-	power_label.text = "%d%%" % roundi(power_value * 100.0)
 	power_meter.power_value = power_value
-	set_status("POWER · %s foot · charge into the optimal zone, then release" % kicking_foot.to_upper())
+	_show_primary_instruction("Hold power", _power_feedback(power_value))
+	power_label.text = "%d%%" % roundi(power_value * 100.0)
+	set_status("POWER - %s foot - release in the 70-85%% ideal zone" % kicking_foot.to_upper())
 
 func show_support_foot_sector(selected_foot: String, _difficulty: FreeKickDifficulty) -> void:
 	hide_all()
+	_set_active_step(2)
 	var support_foot := _support_foot_for_kick(selected_foot)
 	power_label.visible = false
 	power_meter.visible = false
@@ -325,11 +356,8 @@ func show_support_foot_sector(selected_foot: String, _difficulty: FreeKickDiffic
 		support_zone_has_marker = false
 		support_zone_show_angle = false
 		support_zone_overlay.queue_redraw()
-	feedback_label.visible = true
-	instruction_label.visible = true
-	instruction_label.text = "Zenith view · place %s foot beside the real ball" % support_foot
-	feedback_label.text = "Plant foot"
-	set_status("PLANT · support: %s · kicking: %s" % [support_foot, selected_foot])
+	_show_primary_instruction("Place support foot", "%s plant beside the ball. Release to lock position." % support_foot.capitalize())
+	set_status("PLANT - support: %s - kicking: %s" % [support_foot, selected_foot])
 
 func update_support_marker(local_pos: Vector2) -> void:
 	if support_panel.visible:
@@ -346,12 +374,12 @@ func update_support_marker(local_pos: Vector2) -> void:
 		support_marker_hint.queue_redraw()
 	var side := "LEFT of ball" if local_pos.x < 0.0 else "RIGHT of ball"
 	var plant := "ahead/open" if local_pos.y < -18.0 else "behind/closed" if local_pos.y > 18.0 else "level/balanced"
-	feedback_label.text = "Plant: %s · %s" % [side, plant]
-	set_status("Plant %s · %s · release" % [side, plant])
+	feedback_label.text = "Plant: %s - %s" % [side, plant]
+	set_status("Plant %s - %s - release" % [side, plant])
 
 func update_support_foot_angle(angle: float, aim_target: float = 0.0) -> void:
 	if support_panel.visible:
-		support_panel.set_substep_label("2/2: drag left/right to aim · ±30° max")
+		support_panel.set_substep_label("2/2: drag left/right to aim - +/-30 deg max")
 		support_panel.set_foot_angle(angle, true, aim_target)
 	support_zone_aim_target = clampf(aim_target, -1.0, 1.0)
 	support_zone_show_angle = true
@@ -363,20 +391,18 @@ func update_support_foot_angle(angle: float, aim_target: float = 0.0) -> void:
 		support_zone_overlay.queue_redraw()
 	var foot_offset := support_zone_aim_target * 30.0
 	var target_label := "RIGHT POST" if aim_target > 0.25 else "LEFT POST" if aim_target < -0.25 else "CENTER"
-	feedback_label.text = "Aim: %s · foot %+.0f°" % [target_label, foot_offset]
-	set_status("Aim %s · drag left/right, release to shoot setup" % target_label)
+	feedback_label.text = "Aim: %s - foot %+.0f deg" % [target_label, foot_offset]
+	set_status("Aim %s - drag left/right, release to shoot setup" % target_label)
 
 func show_ball_contact_ui() -> void:
 	hide_all()
+	_set_active_step(3)
 	power_label.visible = false
 	ball_panel.visible = true
 	ball_panel.modulate = Color(1.0, 1.0, 1.0, 0.92)
 	ball_panel.clear_swipe()
-	feedback_label.visible = true
-	instruction_label.visible = true
-	instruction_label.text = "Touch · drag through ball"
-	feedback_label.text = "Ball contact"
-	set_status("CONTACT · foreground ball touch")
+	_show_primary_instruction("Touch, then drag", "Contact point sets height. Follow-through sets curl.")
+	set_status("CONTACT - foreground ball touch")
 
 func update_ball_contact(points: PackedVector2Array) -> void:
 	ball_panel.set_swipe_points(points)
@@ -389,19 +415,19 @@ func _ball_contact_feedback(points: PackedVector2Array) -> String:
 	var contact := points[0] / maxf(1.0, ball_panel.ball_radius_px)
 	var height := "lift" if contact.y > 0.25 else "drive" if contact.y < -0.25 else "medium height"
 	if points.size() < 2:
-		return "Contact: %s · now drag follow-through" % height
+		return "Contact: %s - now drag follow-through" % height
 	var follow := (points[points.size() - 1] - points[0]) / maxf(1.0, ball_panel.ball_radius_px)
 	var curl_strength := absf(follow.x) + absf(contact.x) * 0.75
 	var curl_side := "left" if follow.x < -0.12 else "right" if follow.x > 0.12 else "straight"
 	var curl_label := "LOW" if curl_strength < 0.35 else "MEDIUM" if curl_strength < 0.85 else "HIGH"
 	var length_label := "short" if follow.length() < 0.45 else "good" if follow.length() < 1.0 else "big"
-	return "Contact: %s · curl: %s %s · follow-through: %s" % [height, curl_label, curl_side, length_label]
+	return "Contact: %s - curl: %s %s - follow-through: %s" % [height, curl_label, curl_side, length_label]
 
 func _ball_contact_status(points: PackedVector2Array) -> String:
 	if points.size() < 2:
 		return "Step 3: hold on contact point, then drag"
 	var follow := (points[points.size() - 1] - points[0]) / maxf(1.0, ball_panel.ball_radius_px)
-	return "Step 3: sideways %.0f%% · length %.0f%% · release to shoot" % [absf(follow.x) * 100.0, follow.length() * 100.0]
+	return "Step 3: sideways %.0f%% - length %.0f%% - release to shoot" % [absf(follow.x) * 100.0, follow.length() * 100.0]
 
 func align_support_marker_hint(ball: Node3D, camera: Camera3D, selected_foot: String, world_offset: Vector2 = Vector2.ZERO) -> void:
 	if ball == null or camera == null:
@@ -452,27 +478,66 @@ func align_ball_contact_overlay(ball: Node3D, camera: Camera3D, world_radius: fl
 
 func show_feedback(report: Resource, auto_restart_delay_seconds: float = 4.0) -> void:
 	hide_all()
+	_set_active_step(4)
 	feedback_label.visible = true
 	feedback_label.position = Vector2(24.0, 370.0)
-	feedback_label.size = Vector2(680.0, 150.0)
-	feedback_label.add_theme_font_size_override("font_size", 16)
+	feedback_label.size = Vector2(760.0, 210.0)
+	feedback_label.add_theme_font_size_override("font_size", 15)
 	feedback_label.add_theme_stylebox_override("normal", _make_panel_style(Color(0.0, 0.0, 0.0, 0.34), Color(1.0, 1.0, 1.0, 0.14), 1, 6))
 	instruction_label.visible = true
 	instruction_label.text = "Auto restart in %.0fs" % auto_restart_delay_seconds
 	if report != null and report.get("summary") != null:
-		feedback_label.text = String(report.get("summary"))
-		if report.get("support_feedback") != null and String(report.get("support_feedback")) != "":
-			feedback_label.text += "\nPlant: %s" % String(report.get("support_feedback"))
-		if report.get("coach_tip") != null and String(report.get("coach_tip")) != "":
-			feedback_label.text += "\nTip: %s" % String(report.get("coach_tip"))
-		if report.get("peak_height") != null:
-			feedback_label.text += "\nPeak %.1fm · flight %.1fs · aim %.1f°" % [float(report.get("peak_height")), float(report.get("total_flight_time")), float(report.get("horizontal_angle"))]
+		feedback_label.text = _format_feedback_report(report)
 	else:
 		feedback_label.text = "Shot complete"
 	set_status("Auto restart")
 
+func _format_feedback_report(report: Resource) -> String:
+	var lines: Array[String] = []
+	lines.append(String(report.get("summary")).to_upper())
+	var power := float(report.get("power"))
+	var elevation := float(report.get("elevation_angle"))
+	var horizontal := float(report.get("horizontal_angle"))
+	var spin_rate := float(report.get("spin_rate"))
+	var curl_strength := String(report.get("curl_strength"))
+	lines.append("Power: %s" % _power_feedback(power))
+	if report.get("support_feedback") != null and String(report.get("support_feedback")) != "":
+		lines.append("Plant: %s" % String(report.get("support_feedback")))
+	if elevation > 28.0:
+		lines.append("Contact: low strike added extra lift")
+	elif elevation < 6.0:
+		lines.append("Contact: high/central strike kept it flat")
+	else:
+		lines.append("Contact: usable launch height")
+	if absf(horizontal) > 10.0:
+		lines.append("Aim: large support-foot target offset")
+	if spin_rate < 18.0 or curl_strength == "low":
+		lines.append("Curl: low — add side contact or a longer sideways drag")
+	else:
+		lines.append("Curl: %s" % curl_strength)
+	if report.get("coach_tip") != null and String(report.get("coach_tip")) != "":
+		lines.append("Tip: %s" % String(report.get("coach_tip")))
+	if report.get("peak_height") != null:
+		lines.append("Data: peak %.1fm · flight %.1fs · aim %.1f°" % [float(report.get("peak_height")), float(report.get("total_flight_time")), horizontal])
+	return "\n".join(lines)
+
 func set_status(text: String) -> void:
 	status_label.text = text
+
+func _show_primary_instruction(action: String, consequence: String) -> void:
+	instruction_label.visible = true
+	feedback_label.visible = true
+	instruction_label.text = action
+	feedback_label.text = consequence
+
+func _power_feedback(power_value: float) -> String:
+	if power_value < 0.40:
+		return "low — hold longer for distance"
+	if power_value < 0.70:
+		return "controlled — keep charging toward ideal"
+	if power_value <= 0.85:
+		return "ideal window — release now"
+	return "risk — extra power reduces precision"
 
 func _apply_mvp_layout() -> void:
 	var root := get_node_or_null("Root") as Control
@@ -489,18 +554,18 @@ func _apply_mvp_layout() -> void:
 	power_meter.kicking_foot = kicking_foot
 	_position_power_meter_for_foot()
 	feedback_label.position = Vector2(24.0, 304.0)
-	feedback_label.size = Vector2(430.0, 58.0)
+	feedback_label.size = Vector2(520.0, 58.0)
 	feedback_label.add_theme_font_size_override("font_size", 15)
 	feedback_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.82))
 	instruction_label.position = Vector2(24.0, 676.0)
 	instruction_label.size = Vector2(760.0, 28.0)
-	instruction_label.add_theme_font_size_override("font_size", 16)
-	instruction_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.72))
+	instruction_label.add_theme_font_size_override("font_size", 20)
+	instruction_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.9))
 	instruction_label.remove_theme_stylebox_override("normal")
 	status_label.position = Vector2(24.0, 642.0)
 	status_label.size = Vector2(520.0, 24.0)
-	status_label.add_theme_font_size_override("font_size", 13)
-	status_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.42))
+	status_label.add_theme_font_size_override("font_size", 12)
+	status_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.28))
 	status_label.remove_theme_stylebox_override("normal")
 	_style_button(restart_button, Vector2(24.0, 586.0), Vector2(158.0, 40.0), "Restart  R")
 	restart_button.visible = false

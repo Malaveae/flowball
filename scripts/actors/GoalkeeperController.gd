@@ -14,7 +14,8 @@ const HIGH_ZONE_Y := 1.8
 @export var idle_breath_height: float = 0.035
 @export var idle_sway_degrees: float = 1.5
 @export var idle_cycle_seconds: float = 1.35
-@export var animation_player_path: NodePath = NodePath("AnimationPlayer")
+@export var animation_player_path: NodePath = NodePath("Model/ImportedGoalkeeper/AnimationPlayer")
+@export var fallback_animation_player_path: NodePath = NodePath("AnimationPlayer")
 @export var model_path: NodePath = NodePath("Model")
 @export var skeleton_path: NodePath = NodePath("Model/ImportedGoalkeeper/GoalkeeperArmature/Skeleton3D")
 
@@ -28,11 +29,13 @@ var _idle_time := 0.0
 var _motion_tween: Tween
 var _idle_tween: Tween
 
-@onready var animation_player: AnimationPlayer = get_node_or_null(animation_player_path) as AnimationPlayer
+@onready var animation_player: AnimationPlayer = _resolve_animation_player()
 @onready var model: Node3D = get_node_or_null(model_path) as Node3D
 @onready var skeleton: Skeleton3D = get_node_or_null(skeleton_path) as Skeleton3D
 
 func _ready() -> void:
+	if animation_player == null:
+		push_warning("GoalkeeperController could not find an AnimationPlayer; goalkeeper animations will be visual-only movement.")
 	home_position = global_position
 	if model != null:
 		_model_home_position = model.position
@@ -172,6 +175,12 @@ func _play_animation(animation_name: StringName) -> void:
 		return
 	if animation_player.has_animation(animation_name):
 		animation_player.play(animation_name)
+
+func _resolve_animation_player() -> AnimationPlayer:
+	var imported_player := get_node_or_null(animation_player_path) as AnimationPlayer
+	if imported_player != null:
+		return imported_player
+	return get_node_or_null(fallback_animation_player_path) as AnimationPlayer
 
 func _stop_motion_tween() -> void:
 	if _motion_tween != null and _motion_tween.is_valid():

@@ -28,8 +28,8 @@ func enter(_controller: FreeKickController) -> void:
 
 func _process(delta: float) -> void:
 	elapsed += delta
-	var step_text := "1/2 LOCATION — release to lock" if substep == Substep.LOCATION else "2/2 FOOT ANGLE — release to continue"
-	controller.ui.set_status("State: PLANT %s · %.1fs" % [step_text, maxf(0.0, controller.difficulty.step2_time_limit - elapsed)])
+	var step_text := "1/2 LOCATION - release to lock" if substep == Substep.LOCATION else "2/2 FOOT ANGLE - release to continue"
+	controller.ui.set_status("PLANT %s - %.1fs" % [step_text, maxf(0.0, controller.difficulty.step2_time_limit - elapsed)])
 	_align_world_marker()
 	if touching:
 		touch_elapsed += delta
@@ -161,8 +161,8 @@ func _support_quality(support: Vector2) -> float:
 	return clampf(lateral_quality * depth_quality, 0.18, 1.0)
 
 func _support_angle_quality(target: float) -> float:
-	# 0 = foot points at target for straight/power. 10-25° open is still good for curl.
-	# The aim slider maps to about ±30° visually, so full extremes trade control for shape.
+	# 0 = foot points at target for straight/power. 10-25 degrees open is still good for curl.
+	# The aim slider maps to about +/-30 degrees visually, so full extremes trade control for shape.
 	var open_amount := absf(clampf(target, -1.0, 1.0))
 	if open_amount <= 0.55:
 		return 1.0

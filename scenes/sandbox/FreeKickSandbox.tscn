@@ -120,6 +120,10 @@ roughness = 0.82
 material = SubResource("StandardMaterial3D_background_grass")
 size = Vector2(78, 8.5)
 
+[sub_resource type="QuadMesh" id="QuadMesh_lateral_grass_blend"]
+material = SubResource("StandardMaterial3D_background_grass")
+size = Vector2(105, 8.5)
+
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_tribuna_background"]
 friction = 0.75
 bounce = 0.08
@@ -155,9 +159,41 @@ size = Vector3(0.12, 2.44, 1.35)
 [sub_resource type="BoxShape3D" id="BoxShape_net_roof"]
 size = Vector3(7.52, 0.12, 1.35)
 
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_stadium"]
+sky_top_color = Color(0.32, 0.58, 0.88, 1)
+sky_horizon_color = Color(0.65, 0.78, 0.95, 1)
+ground_bottom_color = Color(0.22, 0.28, 0.18, 1)
+ground_horizon_color = Color(0.4, 0.45, 0.35, 1)
+sky_energy = 0.85
+sun_angle_max = 45.0
+sun_latitude = 35.0
+sun_longitude = 0.0
+
+[sub_resource type="Sky" id="Sky_stadium"]
+sky_material = SubResource("ProceduralSkyMaterial_stadium")
+
 [sub_resource type="Environment" id="Environment_1"]
-background_mode = 1
-background_color = Color(0.11, 0.18, 0.14, 1)
+background_mode = 2
+sky = SubResource("Sky_stadium")
+ambient_light_color = Color(0.45, 0.52, 0.6, 1)
+ambient_light_source = 1
+tonemap_mode = 2
+ssao_enabled = true
+ssao_radius = 1.0
+ssao_intensity = 0.5
+ssao_power = 1.8
+ssao_quality = 1
+glow_enabled = true
+glow_levels/1 = 0.04
+glow_levels/2 = 0.03
+glow_levels/3 = 0.02
+glow_levels/5 = 0.01
+glow_bloom = 0.06
+glow_intensity = 0.4
+glow_strength = 0.8
+adjustment_brightness = 1.0
+adjustment_contrast = 1.08
+adjustment_saturation = 1.04
 
 [node name="FreeKickSandbox" type="Node3D"]
 script = ExtResource("1")
@@ -167,8 +203,11 @@ environment = SubResource("Environment_1")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.866025, -0.353553, 0.353553, 0, 0.707107, 0.707107, -0.5, -0.612372, 0.612372, 0, 8, 0)
-light_energy = 0.8
-light_indirect_energy = 0.65
+light_energy = 0.9
+light_indirect_energy = 0.7
+shadow_enabled = true
+shadow_bias = 0.05
+shadow_normal_bias = 1.5
 
 [node name="StadiumLighting" type="Node3D" parent="."]
 
@@ -367,6 +406,10 @@ physics_material_override = SubResource("PhysicsMaterial_tribuna_background")
 [node name="Mesh" type="MeshInstance3D" parent="LeftLateralBackground"]
 mesh = SubResource("QuadMesh_lateral_tribuna_background")
 
+[node name="GrassBlend" type="MeshInstance3D" parent="LeftLateralBackground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -17.7, 0.02)
+mesh = SubResource("QuadMesh_lateral_grass_blend")
+
 [node name="CollisionShape3D" type="CollisionShape3D" parent="LeftLateralBackground"]
 shape = SubResource("BoxShape_lateral_tribuna_background")
 
@@ -376,6 +419,10 @@ physics_material_override = SubResource("PhysicsMaterial_tribuna_background")
 
 [node name="Mesh" type="MeshInstance3D" parent="RightLateralBackground"]
 mesh = SubResource("QuadMesh_lateral_tribuna_background")
+
+[node name="GrassBlend" type="MeshInstance3D" parent="RightLateralBackground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -17.7, 0.02)
+mesh = SubResource("QuadMesh_lateral_grass_blend")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="RightLateralBackground"]
 shape = SubResource("BoxShape_lateral_tribuna_background")

@@ -121,10 +121,10 @@ func _on_free_kick_finished(report: Resource) -> void:
 
 func _game_over() -> void:
 	game_over = true
-	_update_scoreboard("GAME OVER · failed to score in %d trials." % MAX_TRIALS_PER_SET_PIECE)
+	_update_scoreboard("GAME OVER - failed to score in %d trials." % MAX_TRIALS_PER_SET_PIECE)
 	if controller != null and controller.ui != null:
 		controller.ui.hide_all()
-		controller.ui.set_scoreboard(_scoreboard_text("GAME OVER · failed to score in %d trials. Press R to restart run." % MAX_TRIALS_PER_SET_PIECE))
+		controller.ui.set_scoreboard(_scoreboard_text("GAME OVER - failed to score in %d trials. Press R to restart run." % MAX_TRIALS_PER_SET_PIECE))
 
 func _update_scoreboard(message: String = "") -> void:
 	if controller != null and controller.ui != null:
@@ -135,7 +135,7 @@ func _update_scoreboard(message: String = "") -> void:
 
 func _scoreboard_text(message: String = "") -> String:
 	var trials_left: int = maxi(0, MAX_TRIALS_PER_SET_PIECE - current_spot_attempts)
-	var text: String = "SET PIECE %d  ·  GOALS %d  ·  ATTEMPTS %d\n%s  ·  TRIAL %d/%d  ·  LEFT %d" % [set_piece_number, total_goals, total_attempts, String(current_set_piece.get("label", "Set piece")), current_spot_attempts, MAX_TRIALS_PER_SET_PIECE, trials_left]
+	var text: String = "SET PIECE %d  -  GOALS %d  -  ATTEMPTS %d\n%s  -  TRIAL %d/%d  -  LEFT %d" % [set_piece_number, total_goals, total_attempts, String(current_set_piece.get("label", "Set piece")), current_spot_attempts, MAX_TRIALS_PER_SET_PIECE, trials_left]
 	if message != "":
 		text += "\n%s" % message
 	return text
@@ -162,7 +162,7 @@ func _generate_set_piece() -> void:
 	var z: float = GOAL_CENTER.z + distance
 	var wall_count: int = clampi(difficulty_step / 2, 0, DEFAULT_WALL_PLAYER_COUNT)
 	current_set_piece = {
-		"label": "#%d %s %.0fm · wall %d" % [set_piece_number, side_label.capitalize(), distance, wall_count],
+		"label": "#%d %s %.0fm - wall %d" % [set_piece_number, side_label.capitalize(), distance, wall_count],
 		"position": Vector3(lateral_wave, 0.16, z),
 		"wall_count": wall_count,
 	}

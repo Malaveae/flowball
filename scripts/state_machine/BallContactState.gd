@@ -20,7 +20,7 @@ func enter(_controller: FreeKickController) -> void:
 func _process(delta: float) -> void:
 	elapsed += delta
 	controller.ui.align_ball_contact_overlay(controller.get_ball(), controller.camera_rig.get_camera())
-	controller.ui.set_status("State: POINT + DRAG CONTACT · %.1fs" % maxf(0.0, controller.difficulty.step3_time_limit - elapsed))
+	controller.ui.set_status("CONTACT - point and drag - %.1fs" % maxf(0.0, controller.difficulty.step3_time_limit - elapsed))
 	if touching:
 		swipe_duration += delta
 	elif elapsed >= controller.difficulty.step3_time_limit:

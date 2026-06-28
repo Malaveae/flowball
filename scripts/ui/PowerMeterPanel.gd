@@ -61,6 +61,10 @@ func _draw() -> void:
 
 	_draw_vertical_zone_marker(inner, OPTIMAL_MIN, Color(0.6, 1.0, 0.0, 0.88))
 	_draw_vertical_zone_marker(inner, OPTIMAL_MAX, Color(1.0, 0.2, 0.1, 0.88))
+	_draw_zone_label(inner, 0.20, "LOW", Color(0.0, 0.75, 1.0, 0.9), font)
+	_draw_zone_label(inner, 0.55, "CONTROL", Color(0.55, 1.0, 0.25, 0.9), font)
+	_draw_zone_label(inner, 0.775, "IDEAL", Color(1.0, 0.92, 0.0, 0.95), font)
+	_draw_zone_label(inner, 0.925, "RISK", Color(1.0, 0.22, 0.08, 0.95), font)
 
 	var pointer_y := inner.end.y - inner.size.y * power_value
 	var pointer_color := _power_color(power_value, 1.0)
@@ -74,7 +78,7 @@ func _draw() -> void:
 		boot_rect.position = Vector2(8.0, boot_y)
 	_draw_kicking_boot(boot_rect)
 	_draw_power_value_label(boot_rect, pointer_y, pointer_color)
-	draw_string(font, Vector2(0.0, size.y - 2.0), "%s FOOT  ·  POWER" % kicking_foot.to_upper(), HORIZONTAL_ALIGNMENT_CENTER, size.x, 12, Color(1, 1, 1, 0.48))
+	draw_string(font, Vector2(0.0, size.y - 2.0), "%s FOOT  -  POWER" % kicking_foot.to_upper(), HORIZONTAL_ALIGNMENT_CENTER, size.x, 12, Color(1, 1, 1, 0.48))
 
 func _draw_power_value_label(boot_rect: Rect2, pointer_y: float, color: Color) -> void:
 	var font := get_theme_default_font()
@@ -117,6 +121,11 @@ func _draw_vertical_segment(rect: Rect2, from_t: float, to_t: float, color: Colo
 func _draw_vertical_zone_marker(rect: Rect2, t: float, color: Color) -> void:
 	var y := rect.end.y - rect.size.y * t
 	draw_dashed_line(Vector2(rect.end.x + 6.0, y), Vector2(rect.end.x + 28.0, y), color, 1.2, 4.0)
+
+func _draw_zone_label(rect: Rect2, t: float, label: String, color: Color, font: Font) -> void:
+	var y := rect.end.y - rect.size.y * t + 5.0
+	var text_x := rect.end.x + 34.0
+	draw_string(font, Vector2(text_x, y), label, HORIZONTAL_ALIGNMENT_LEFT, 82.0, 10, color)
 
 func _power_color(value: float, alpha: float) -> Color:
 	if value < 0.40:

@@ -199,6 +199,9 @@ def create_action(armature: bpy.types.Object, name: str, keys: list[tuple[int, d
 
 
 def create_placeholder_actions(armature: bpy.types.Object) -> None:
+    # Keep these action names aligned with GoalkeeperController.gd. Godot gameplay
+    # calls stable clip names so generated, mocap, or hand-authored animation can
+    # replace this prototype rig without script changes.
     create_action(armature, "gk_idle", [
         (1, {"spine": (2, 0, 0), "upper_arm.L": (0, 0, -8), "upper_arm.R": (0, 0, 8), "shin.L": (-4, 0, 0), "shin.R": (-4, 0, 0)}),
         (20, {"spine": (-1, 0, 1), "upper_arm.L": (0, 0, -11), "upper_arm.R": (0, 0, 11), "shin.L": (-7, 0, 0), "shin.R": (-7, 0, 0)}),
@@ -220,7 +223,19 @@ def create_placeholder_actions(armature: bpy.types.Object) -> None:
         (1, {}),
         (14, {"root": (0, 0, -18), "spine": (0, 0, -28), "upper_arm.R": (0, 0, 55), "forearm.R": (0, 0, 25), "upper_arm.L": (0, 0, 18), "thigh.R": (0, 0, 18), "thigh.L": (0, 0, 8)}),
     ])
+    create_action(armature, "gk_dive_up", [
+        (1, {"spine": (8, 0, 0), "shin.L": (-14, 0, 0), "shin.R": (-14, 0, 0)}),
+        (12, {"root": (-8, 0, 0), "spine": (-10, 0, 0), "upper_arm.L": (-56, 0, -14), "upper_arm.R": (-56, 0, 14), "forearm.L": (-18, 0, -8), "forearm.R": (-18, 0, 8), "thigh.L": (18, 0, -6), "thigh.R": (18, 0, 6), "shin.L": (-32, 0, 0), "shin.R": (-32, 0, 0)}),
+    ])
+    create_action(armature, "gk_land", [
+        (1, {"root": (0, 0, 16), "spine": (4, 0, 22), "upper_arm.L": (8, 0, -38), "upper_arm.R": (8, 0, -12)}),
+        (18, {"spine": (12, 0, 8), "upper_arm.L": (24, 0, -18), "upper_arm.R": (24, 0, 18), "thigh.L": (18, 0, 0), "thigh.R": (18, 0, 0), "shin.L": (-34, 0, 0), "shin.R": (-34, 0, 0)}),
+    ])
     create_action(armature, "gk_recover", [(1, {}), (24, {"spine": (8, 0, 0), "shin.L": (-10, 0, 0), "shin.R": (-10, 0, 0)})])
+    create_action(armature, "gk_concede", [
+        (1, {"spine": (6, 0, 0), "upper_arm.L": (12, 0, -12), "upper_arm.R": (12, 0, 12)}),
+        (20, {"spine": (-8, 0, 0), "head": (12, 0, 0), "upper_arm.L": (30, 0, -28), "upper_arm.R": (30, 0, 28), "forearm.L": (24, 0, -16), "forearm.R": (24, 0, 16)}),
+    ])
     clear_pose(armature)
 
 

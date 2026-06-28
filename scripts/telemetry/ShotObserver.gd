@@ -59,7 +59,7 @@ func build_report(_input_data: FreeKickInputData) -> FreeKickFeedbackReport:
 		report.outcome = telemetry.final_outcome
 		report.peak_height = telemetry.peak_height
 		report.total_flight_time = telemetry.total_flight_time
-	report.summary = "Shot %s · %s · power %d%% · curl %s %s · elev %.0f°" % [String(report.outcome), String(report.shot_type), roundi(report.power * 100.0), String(report.curl_strength), String(report.curl_direction), report.elevation_angle]
+	report.summary = "Shot %s - %s - power %d%% - curl %s %s - elev %.0f deg" % [String(report.outcome), String(report.shot_type), roundi(report.power * 100.0), String(report.curl_strength), String(report.curl_direction), report.elevation_angle]
 	return report
 
 func _support_feedback(input_data: FreeKickInputData) -> String:
@@ -81,7 +81,7 @@ func _support_feedback(input_data: FreeKickInputData) -> String:
 		quality_note = "poor anchor: less power/control"
 	elif input_data.support_quality < 0.72:
 		quality_note = "risky anchor"
-	return "%s · %s · %s · %s" % [side_note, depth_note, angle_note, quality_note]
+	return "%s - %s - %s - %s" % [side_note, depth_note, angle_note, quality_note]
 
 func _coach_tip(input_data: FreeKickInputData, params: ShotParams, report: FreeKickFeedbackReport) -> String:
 	if input_data.used_default_support or input_data.used_default_contact:

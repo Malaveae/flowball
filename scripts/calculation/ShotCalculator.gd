@@ -59,7 +59,7 @@ static func calculate(
 	params.horizontal_angle += params.final_error.x
 	params.elevation_angle = clampf(params.elevation_angle + params.final_error.y, MIN_ELEVATION_DEG, MAX_ELEVATION_DEG)
 
-	var speed := _launch_speed(params.power, power_stat, environment.distance_to_goal, input.support_quality)
+	var speed := _launch_speed(params.power, power_stat, environment.distance_to_goal, input.support_quality, input.step2_to_step3_ms)
 	params.launch_velocity = _launch_velocity(environment.base_goal_direction, params.horizontal_angle, params.elevation_angle, speed)
 	params.shot_type = _classify_shot(params, swipe_vector)
 	return params
@@ -67,10 +67,17 @@ static func calculate(
 static func power_from_hold(hold_time: float, charge_tau: float = 0.75) -> float:
 	return clampf(1.0 - exp(-maxf(0.0, hold_time) / charge_tau), 0.0, 1.0)
 
-static func _launch_speed(power: float, power_stat: float, distance: float, support_quality: float) -> float:
+static func _launch_speed(power: float, power_stat: float, distance: float, support_quality: float, step2_to_step3_ms: int = 0) -> float:
 	var distance_bonus := clampf((distance - 18.0) / 22.0, 0.0, 0.25)
 	var support_transfer := lerpf(0.62, 1.0, clampf(support_quality, 0.0, 1.0))
+	# Quick transition from step 2 support foot to step 3 ball contact rewards
+	# instinctive follow-through. <200ms = max bonus, >800ms = no bonus.
+	var transition_bonus := 1.0
+	if step2_to_step3_ms > 0:
+		var transition_quality := clampf(1.0 - float(step2_to_step3_ms - 200) / 600.0, 0.0, 1.0)
+		transition_bonus = lerpf(1.0, 1.08, transition_quality)
 	var speed := lerpf(14.0, MAX_LAUNCH_SPEED, power) * lerpf(0.85, 1.08, power_stat) * support_transfer + distance_bonus * 4.0
+	speed *= transition_bonus
 	return clampf(speed, MIN_LAUNCH_SPEED, MAX_LAUNCH_SPEED)
 
 static func _launch_velocity(base_direction: Vector3, horizontal_deg: float, elevation_deg: float, speed: float) -> Vector3:

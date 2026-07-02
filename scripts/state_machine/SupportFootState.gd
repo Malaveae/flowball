@@ -139,6 +139,8 @@ func _commit(use_default: bool) -> void:
 		controller.input_data.support_aim_target = aim_target
 		controller.input_data.support_quality = _support_quality(support)
 		controller.input_data.support_angle_quality = _support_angle_quality(aim_target)
+	if not use_default:
+		controller._step2_end_msec = Time.get_ticks_msec()
 	finished.emit(&"BallContactState")
 
 func _support_quality(support: Vector2) -> float:

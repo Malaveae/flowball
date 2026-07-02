@@ -84,11 +84,11 @@ func _goal_centered_transform(next_mode: StringName) -> Transform3D:
 			behind = 4.2
 			look_height = 0.7
 		&"FEEDBACK_REPLAY":
-			# Broadcast-style replay view: elevated and offset to see the full ball path clearly.
-			height = 5.2
-			behind = clampf(distance * 0.30, 7.0, 11.0)
-			side = 6.5
-			look_height = 1.8
+			# Replay view: wide diagonal to illustrate the full ball trajectory.
+			height = 5.5
+			behind = clampf(distance * 0.40, 10.0, 16.0)
+			side = 10.0
+			look_height = 1.5
 		_:
 			height = 4.0
 			behind = clampf(distance * 0.4, 8.0, 14.0)
@@ -96,6 +96,9 @@ func _goal_centered_transform(next_mode: StringName) -> Transform3D:
 	var origin := ball - dir * behind + right * side + Vector3.UP * height
 	origin = _clamp_camera_origin(origin)
 	var target := goal.lerp(ball, 0.18) + Vector3.UP * look_height
+	if next_mode == &"FEEDBACK_REPLAY":
+		# Look further back toward the ball path to illustrate trajectory.
+		target = goal.lerp(ball, 0.40) + Vector3.UP * look_height
 	if next_mode == &"POWER_VIEW":
 		# Initial eye-level view behind the ball: look slightly higher so the horizon sits lower and feels less top-down.
 		target = ball + dir * 3.0 + Vector3.UP * 0.55

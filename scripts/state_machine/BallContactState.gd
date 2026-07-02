@@ -6,6 +6,7 @@ var swipe_duration := 0.0
 var touching := false
 var ball_radius_px := 180.0
 var raw_points := PackedVector2Array()
+var _transition_recorded := false
 
 func enter(_controller: FreeKickController) -> void:
 	super.enter(_controller)
@@ -13,6 +14,7 @@ func enter(_controller: FreeKickController) -> void:
 	swipe_duration = 0.0
 	touching = false
 	raw_points = PackedVector2Array()
+	_transition_recorded = false
 	controller.camera_rig.set_mode(&"BALL_CONTACT_UI")
 	controller.ui.show_ball_contact_ui()
 	controller.ui.set_status("Step 3: point on ball, then drag follow-through")
@@ -56,6 +58,9 @@ func _input(event: InputEvent) -> void:
 		should_add_point = true
 
 	if should_add_point:
+		if not _transition_recorded and controller._step2_end_msec > 0:
+			_transition_recorded = true
+			controller.input_data.step2_to_step3_ms = Time.get_ticks_msec() - controller._step2_end_msec
 		var ball_control := controller.ui.get_ball_contact_control()
 		var local := FreeKickInputMapper.screen_to_control_local(pos, ball_control)
 		if raw_points.is_empty():

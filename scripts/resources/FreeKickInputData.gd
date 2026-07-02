@@ -21,6 +21,8 @@ extends Resource
 @export var contact_timer_expired: bool = false
 @export var used_default_contact: bool = false
 
+@export var step2_to_step3_ms: int = 0  # ms between step 2 commit and step 3 first touch
+
 func reset() -> void:
 	hold_time = 0.0
 	power_normalized = 0.0
@@ -39,3 +41,4 @@ func reset() -> void:
 	swipe_duration = 0.0
 	contact_timer_expired = false
 	used_default_contact = false
+	step2_to_step3_ms = 0

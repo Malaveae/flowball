@@ -39,6 +39,8 @@ var completed_set_pieces: Array[Dictionary] = []
 func _ready() -> void:
 	wall_rng.randomize()
 	_setup_wall_dummies()
+	_find_grass_patch()
+	_setup_ground_shader()
 	var goal_trigger := get_node_or_null("GoalTrigger") as GoalTrigger3D
 	if goal_trigger != null:
 		goal_trigger.goal_scored.connect(_on_goal_scored)
@@ -158,14 +160,65 @@ func _generate_set_piece() -> void:
 	var distance: float = clampf(20.0 + float(difficulty_step) * 1.15, MIN_FREE_KICK_DISTANCE, MAX_FREE_KICK_DISTANCE)
 	var lateral_limit: float = minf(MAX_LATERAL_OFFSET, 2.0 + float(difficulty_step) * 0.85)
 	var lateral_wave: float = sin(float(set_piece_number) * 1.83) * lateral_limit
-	var side_label: String = "center" if absf(lateral_wave) < 1.5 else "left" if lateral_wave < 0.0 else "right"
 	var z: float = GOAL_CENTER.z + distance
 	var wall_count: int = clampi(difficulty_step / 2, 0, DEFAULT_WALL_PLAYER_COUNT)
+	
+	# After set piece 50, bias toward penalty area corners: shorter distance, higher lateral.
+	if set_piece_number > 50:
+		var corner_factor := clampf(float(set_piece_number - 51) / 12.0, 0.0, 1.0)
+		lateral_limit = lerpf(lateral_limit, 18.0, corner_factor)
+		lateral_wave = sin(float(set_piece_number) * 2.47 + 1.2) * lateral_limit
+		var corner_distance := 20.0 + float((set_piece_number - 51) % 5) * 2.0
+		distance = lerpf(distance, corner_distance, corner_factor)
+		z = GOAL_CENTER.z + distance
+	
+	var side_label: String = "center" if absf(lateral_wave) < 1.5 else "left" if lateral_wave < 0.0 else "right"
 	current_set_piece = {
 		"label": "#%d %s %.0fm - wall %d" % [set_piece_number, side_label.capitalize(), distance, wall_count],
 		"position": Vector3(lateral_wave, 0.16, z),
 		"wall_count": wall_count,
 	}
+
+var _grass_patches: Array[GrassPatch3D] = []
+
+func _find_grass_patch() -> void:
+	_grass_patches.clear()
+	for i in range(14):
+		var patch := get_node_or_null("GrassPatch%d" % i) as GrassPatch3D
+		if patch:
+			_grass_patches.append(patch)
+
+func _process(_delta: float) -> void:
+	if _grass_patches.is_empty():
+		return
+	var positions: Array[Vector3] = []
+	var ball := controller.get_ball()
+	if ball:
+		positions.append(ball.global_position)
+	# Could also add wall dummies, goalkeeper, etc.
+	for patch in _grass_patches:
+		patch.set_actor_positions(positions)
+
+func _setup_ground_shader() -> void:
+	var pitch_mesh := get_node_or_null("TestPitch/PitchMesh") as MeshInstance3D
+	if pitch_mesh == null:
+		return
+	var shader := load("res://assets/shaders/pitch_ground.gdshader") as Shader
+	if shader == null:
+		return
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+	mat.set_shader_parameter("albedo_tex", load("res://assets/Cesped/grass_albedo_2048.png"))
+	mat.set_shader_parameter("normal_tex", load("res://assets/Cesped/grass_normal_1024.png"))
+	mat.set_shader_parameter("rough_tex",  load("res://assets/Cesped/grass_roughness_1024.png"))
+	mat.set_shader_parameter("uv_scale_x", 42.0)
+	mat.set_shader_parameter("uv_scale_y", 64.0)
+	mat.set_shader_parameter("patch_noise_scale", 3.5)
+	mat.set_shader_parameter("patch_noise_strength", 0.12)
+	pitch_mesh.material_override = mat
+	var goal_floor := get_node_or_null("GoalBackgroundFloor/Mesh") as MeshInstance3D
+	if goal_floor != null:
+		goal_floor.material_override = mat.duplicate()
 
 func _setup_wall_dummies() -> void:
 	wall_root = Node3D.new()

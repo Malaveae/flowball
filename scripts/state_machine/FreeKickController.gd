@@ -16,6 +16,7 @@ var shot_params: ShotParams
 var run_id: int = 0
 var free_kick_position: Vector3 = Vector3(0.0, 0.16, 0.0)
 var spot_label: String = "Center 24m"
+var _step2_end_msec: int = 0  # transient: timestamp when step 2 committed, used for step2→3 speed bonus
 
 @onready var state_machine: FreeKickStateMachine = $FreeKickStateMachine
 @onready var ui: FreeKickUI = $FreeKickUI

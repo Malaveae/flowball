@@ -26,6 +26,8 @@ func enter(_controller: FreeKickController) -> void:
 		return
 	if ball != null:
 		_launch_position = ball.global_position
+		if ball.aerodynamics != null:
+			ball.aerodynamics.wind_vector = controller.environment.wind_vector
 		ball.launch(controller.shot_params, controller.get_kicker())
 		if not ball.came_to_rest.is_connected(_on_ball_done):
 			ball.came_to_rest.connect(_on_ball_done, CONNECT_ONE_SHOT)

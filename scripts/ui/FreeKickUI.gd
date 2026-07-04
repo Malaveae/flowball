@@ -19,6 +19,9 @@ class ModernScoreHud:
 	var fallback_text := ""
 	var active_step := 0
 	var _pulse := 0.0
+	var distance_to_goal: float = 24.0
+	var wind_speed: float = 0.0
+	var wind_direction_deg: float = 0.0
 
 	func _ready() -> void:
 		process_mode = Node.PROCESS_MODE_ALWAYS
@@ -47,6 +50,34 @@ class ModernScoreHud:
 		active_step = clampi(step, 0, 4)
 		queue_redraw()
 
+	func set_environment(distance: float, wind: Vector3) -> void:
+		distance_to_goal = distance
+		wind_speed = wind.length()
+		if wind_speed > 0.01:
+			wind_direction_deg = rad_to_deg(atan2(wind.x, -wind.z))
+		else:
+			wind_direction_deg = 0.0
+		queue_redraw()
+
+	func _wind_arrow() -> String:
+		var deg := fmod(wind_direction_deg + 360.0, 360.0)
+		if deg < 22.5 or deg >= 337.5:
+			return "\u2193"
+		elif deg < 67.5:
+			return "\u2199"
+		elif deg < 112.5:
+			return "\u2190"
+		elif deg < 157.5:
+			return "\u2196"
+		elif deg < 202.5:
+			return "\u2191"
+		elif deg < 247.5:
+			return "\u2197"
+		elif deg < 292.5:
+			return "\u2192"
+		else:
+			return "\u2198"
+
 	func _draw() -> void:
 		var rect := Rect2(Vector2.ZERO, size)
 		var font := get_theme_default_font()
@@ -66,7 +97,7 @@ class ModernScoreHud:
 
 		_draw_stepper(font)
 		var footer := "SCORE AT LEAST ONCE IN 3 TRIALS" if message == "" else message.to_upper()
-		draw_string(font, Vector2(0.0, 170.0), footer, HORIZONTAL_ALIGNMENT_CENTER, size.x, 14, Color(0.04, 0.86, 1.0, 0.95))
+		draw_string(font, Vector2(right_rect.position.x, right_rect.end.y + 6.0), footer, HORIZONTAL_ALIGNMENT_LEFT, right_rect.size.x, 13, Color(0.04, 0.86, 1.0, 0.95))
 
 	func _draw_stadium_glass(rect: Rect2, glow: float) -> void:
 		var poly := PackedVector2Array([
@@ -88,9 +119,37 @@ class ModernScoreHud:
 		draw_line(a + Vector2(2.0, 0.0), b + Vector2(2.0, 0.0), Color(0.0, 0.7, 1.0, 0.10), 1.0)
 
 	func _draw_level(font: Font, rect: Rect2) -> void:
-		draw_string(font, rect.position + Vector2(0.0, 21.0), "SET PIECE", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 17, Color(1.0, 1.0, 1.0, 0.88))
-		draw_string(font, rect.position + Vector2(0.0, 74.0), "%02d" % level, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 43, Color(0.08, 0.84, 1.0, 1.0))
-		_draw_progress_bar(Rect2(rect.position + Vector2(0.0, 93.0), Vector2(210.0, 10.0)), clampf(float(level % 5) / 5.0, 0.18, 1.0), Color(0.04, 0.83, 1.0, 1.0))
+		draw_string(font, rect.position + Vector2(0.0, 16.0), "SET PIECE", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 11, Color(0.6, 0.78, 0.92, 0.7))
+		draw_string(font, rect.position + Vector2(0.0, 60.0), "%02d" % level, HORIZONTAL_ALIGNMENT_LEFT, 88.0, 42, Color(0.08, 0.84, 1.0, 1.0))
+		var split_x := rect.position.x + 88.0
+		draw_line(Vector2(split_x, rect.position.y + 22.0), Vector2(split_x, rect.position.y + 96.0), Color(1.0, 1.0, 1.0, 0.12), 1.0)
+		var right_x := split_x + 10.0
+		var right_w := rect.size.x - 98.0
+		var row1_y := rect.position.y + 50.0
+		# DIST label and value inline
+		draw_circle(Vector2(right_x + 3.0, row1_y - 4.0), 2.5, Color(0.4, 0.85, 1.0, 0.8))
+		draw_line(Vector2(right_x + 3.0, row1_y - 1.5), Vector2(right_x + 3.0, row1_y + 2.5), Color(0.4, 0.85, 1.0, 0.5), 1.2)
+		draw_string(font, Vector2(right_x + 10.0, row1_y - 3.0), "DIST", HORIZONTAL_ALIGNMENT_LEFT, 30.0, 9, Color(0.55, 0.7, 0.85, 0.6))
+		draw_string(font, Vector2(right_x + 42.0, row1_y), "%.1f m" % distance_to_goal, HORIZONTAL_ALIGNMENT_LEFT, right_w - 42.0, 15, Color(0.78, 0.95, 1.0, 0.95))
+		var row2_y := row1_y + 24.0
+		if wind_speed < 0.3:
+			draw_arc(Vector2(right_x + 3.0, row2_y - 4.0), 2.8, 0.0, TAU, 16, Color(0.45, 0.85, 0.55, 0.8), 1.5)
+			draw_string(font, Vector2(right_x + 10.0, row2_y - 3.0), "WIND", HORIZONTAL_ALIGNMENT_LEFT, 30.0, 9, Color(0.5, 0.7, 0.8, 0.6))
+			draw_string(font, Vector2(right_x + 42.0, row2_y), "calm", HORIZONTAL_ALIGNMENT_LEFT, right_w - 42.0, 15, Color(0.55, 0.9, 0.6, 0.9))
+		else:
+			_draw_wind_arrow(Vector2(right_x + 5.0, row2_y - 4.0), wind_direction_deg, 9.0, Color(0.2, 0.82, 1.0, 0.9))
+			draw_string(font, Vector2(right_x + 10.0, row2_y - 3.0), "WIND", HORIZONTAL_ALIGNMENT_LEFT, 30.0, 9, Color(0.5, 0.7, 0.8, 0.6))
+			draw_string(font, Vector2(right_x + 42.0, row2_y), "%.1f" % wind_speed, HORIZONTAL_ALIGNMENT_LEFT, right_w - 42.0, 15, Color(0.25, 0.85, 1.0, 0.95))
+
+	func _draw_wind_arrow(origin: Vector2, direction_deg: float, length: float, color: Color) -> void:
+		var angle := deg_to_rad(direction_deg)
+		var dir := Vector2(sin(angle), -cos(angle))
+		var end := origin + dir * length
+		draw_line(origin, end, color, 2.0)
+		var head_size := 4.5
+		var head_angle := deg_to_rad(140.0)
+		draw_line(end, end - dir.rotated(head_angle) * head_size, color, 2.0)
+		draw_line(end, end - dir.rotated(-head_angle) * head_size, color, 2.0)
 
 	func _draw_effectiveness(font: Font, rect: Rect2, effectiveness: float) -> void:
 		draw_string(font, rect.position + Vector2(0.0, 21.0), "CONVERSION", HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 17, Color(1.0, 1.0, 1.0, 0.88))
@@ -99,7 +158,6 @@ class ModernScoreHud:
 		draw_string(font, rect.position + Vector2(0.0, 74.0), pct, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x * 0.48, 43, Color(0.62, 1.0, 0.16, 1.0))
 		draw_circle(rect.position + Vector2(rect.size.x * 0.50, 55.0), 4.0, Color(0.62, 1.0, 0.16, 1.0))
 		draw_string(font, rect.position + Vector2(rect.size.x * 0.58, 74.0), ratio, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x * 0.42, 43, Color(1.0, 1.0, 1.0, 0.92))
-		_draw_progress_bar(Rect2(rect.position + Vector2(0.0, 93.0), Vector2(rect.size.x, 10.0)), effectiveness, Color(0.62, 1.0, 0.16, 1.0))
 
 	func _draw_misses(font: Font, rect: Rect2) -> void:
 		draw_string(font, rect.position + Vector2(0.0, 21.0), "MISSES", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 17, Color(1.0, 1.0, 1.0, 0.88))
@@ -224,6 +282,10 @@ func set_scoreboard(text: String) -> void:
 func set_run_hud(level: int, goals: int, attempts: int, misses: int, max_misses: int, message: String = "") -> void:
 	if score_hud != null and score_hud.has_method("set_stats"):
 		score_hud.call("set_stats", level, goals, attempts, misses, max_misses, message)
+
+func set_environment_info(distance: float, wind: Vector3) -> void:
+	if score_hud != null and score_hud.has_method("set_environment"):
+		score_hud.call("set_environment", distance, wind)
 
 func _create_support_zone_overlay() -> Control:
 	var root := get_node_or_null("Root") as Control

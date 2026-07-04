@@ -58,7 +58,7 @@ func cycle_set_piece_spot() -> void:
 	_start_attempt(controller.input_data.selected_foot)
 
 func start_new_attempt(selected_foot: String = "right") -> void:
-	if game_over:
+	if game_over or current_spot_goal_scored:
 		return
 	_start_attempt(selected_foot)
 
@@ -72,8 +72,13 @@ func _start_attempt(selected_foot: String) -> void:
 	if game_over:
 		return
 	current_spot_attempts += 1
-	total_attempts += 1
 	current_spot_goal_scored = false
+	# Randomize wind per attempt: 0.5-7 m/s, any horizontal direction.
+	var wind_angle := randf_range(0.0, TAU)
+	var wind_strength := randf_range(0.5, 7.0)
+	controller.environment.wind_vector = Vector3(cos(wind_angle) * wind_strength, 0.0, sin(wind_angle) * wind_strength)
+	if controller.ui != null:
+		controller.ui.set_environment_info(controller.environment.distance_to_goal, controller.environment.wind_vector)
 	if goalkeeper != null:
 		goalkeeper.call("reset_for_free_kick")
 		goalkeeper.call("set_ready")
@@ -93,6 +98,7 @@ func _on_goal_scored() -> void:
 		return
 	current_spot_goal_scored = true
 	total_goals += 1
+	total_attempts += 1
 	completed_set_pieces.append({
 		"label": String(current_set_piece["label"]),
 		"attempts": current_spot_attempts,
@@ -112,6 +118,7 @@ func _on_shot_calculated(shot_params: ShotParams) -> void:
 func _on_free_kick_finished(report: Resource) -> void:
 	if game_over or current_spot_goal_scored:
 		return
+	total_attempts += 1
 	if report != null and report.get("outcome") == &"goal":
 		if goalkeeper != null:
 			goalkeeper.call("play_goal_conceded_reaction")

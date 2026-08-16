@@ -17,3 +17,7 @@ extends Resource
 @export var error_cone_degrees: float = 0.0
 @export var final_error: Vector2 = Vector2.ZERO
 @export var shot_type: StringName = &"unknown"
+@export var gesture_technique: int = ContactGesture.Technique.LACE
+@export var gesture_quality: float = 1.0
+@export var gesture_l_max: float = 1.8
+@export var quality_dispersion_degrees: float = 0.0

@@ -1,6 +1,11 @@
 class_name GoalNetVisual3D
 extends Node3D
 
+## Visual net for the goal.
+## Uses the Blender-built mesh (assets/models/goal_net.glb) with a GPU vertex
+## shader for impact deformation. Falls back to the legacy procedural
+## cylinder net when the imported mesh is unavailable.
+
 @export var width := 7.32
 @export var height := 2.44
 @export var depth := 1.35
@@ -8,26 +13,90 @@ extends Node3D
 @export var reaction_strength := 0.42
 @export var recovery_speed := 7.5
 
+@export_file("*.glb") var net_mesh_path := "res://assets/models/goal_net.glb"
+@export_file("*.glb") var back_frame_path := "res://assets/models/goal_back_frame.glb"
+@export var shader_path := "res://assets/shaders/goal_net.gdshader"
+
 var _material: StandardMaterial3D
+var _shader_material: ShaderMaterial
+var _mesh_instance: MeshInstance3D
 var _segments: Array[Dictionary] = []
 var _impact_point := Vector3.ZERO
 var _impulse := 0.0
 
 func _ready() -> void:
+	if _try_load_imported_net():
+		_try_load_back_frame()
+		return
 	_build_material()
 	_build_net()
+	_try_load_back_frame()
+
+## Loads the rear support frame that follows the net shape.
+## Static mesh; intentionally NOT wired to the deformation shader.
+func _try_load_back_frame() -> bool:
+	if not ResourceLoader.exists(back_frame_path):
+		return false
+	var packed: PackedScene = load(back_frame_path)
+	if packed == null:
+		return false
+	add_child(packed.instantiate())
+	return true
+
+## Returns true when the Blender net mesh was loaded and wired to the shader.
+func _try_load_imported_net() -> bool:
+	if not ResourceLoader.exists(net_mesh_path):
+		return false
+	var packed: PackedScene = load(net_mesh_path)
+	if packed == null:
+		return false
+	var shader: Shader = load(shader_path) if ResourceLoader.exists(shader_path) else null
+	if shader == null:
+		return false
+	var instance := packed.instantiate()
+	var mesh_instance := _first_mesh_instance(instance)
+	if mesh_instance == null:
+		instance.free()
+		return false
+	add_child(instance)
+	_mesh_instance = mesh_instance
+	_shader_material = ShaderMaterial.new()
+	_shader_material.shader = shader
+	_mesh_instance.material_override = _shader_material
+	return true
+
+func _first_mesh_instance(node: Node) -> MeshInstance3D:
+	if node is MeshInstance3D:
+		return node
+	for child in node.get_children():
+		var found := _first_mesh_instance(child)
+		if found != null:
+			return found
+	return null
 
 func react_to_ball(ball: Node3D) -> void:
 	if ball == null:
 		return
 	_impact_point = to_local(ball.global_position)
 	_impulse = reaction_strength
+	_apply_impulse()
 
 func _process(delta: float) -> void:
 	if _impulse <= 0.001:
 		return
 	_impulse = move_toward(_impulse, 0.0, recovery_speed * delta * reaction_strength)
-	_update_segments()
+	_apply_impulse()
+
+func _apply_impulse() -> void:
+	if _mesh_instance != null and _shader_material != null:
+		_shader_material.set_shader_parameter("impulse", _impulse)
+		_shader_material.set_shader_parameter("impact_point", _impact_point)
+	else:
+		_update_segments()
+
+# ---------------------------------------------------------------------------
+# Legacy procedural fallback (unchanged behavior when the GLB is missing)
+# ---------------------------------------------------------------------------
 
 func _build_material() -> void:
 	_material = StandardMaterial3D.new()

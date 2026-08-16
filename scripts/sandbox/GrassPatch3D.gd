@@ -49,6 +49,8 @@ extends MultiMeshInstance3D
 @export var patch_noise_scale := 8.0
 @export var patch_noise_strength := 0.18
 @export var accent_probability := 0.16
+@export var translucency_gain := 0.4
+@export var blade_forward := 0.3
 
 var _shader_loaded := false
 var _actor_positions: Array[Vector3] = []
@@ -132,6 +134,8 @@ func _populate():
 	mat.set_shader_parameter("patch_noise_scale", patch_noise_scale)
 	mat.set_shader_parameter("patch_noise_strength", patch_noise_strength)
 	mat.set_shader_parameter("accent_probability", accent_probability)
+	mat.set_shader_parameter("translucency_gain", translucency_gain)
+	mat.set_shader_parameter("blade_forward", blade_forward)
 	mat.set_shader_parameter("perspective_factor", perspective_factor)
 	mat.set_shader_parameter("perspective_max_dist", perspective_max_dist)
 	mat.set_shader_parameter("animation_fps", animation_fps)

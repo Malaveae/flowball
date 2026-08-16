@@ -1,0 +1,164 @@
+{
+  "players": [
+    {
+      "id": "starter",
+      "display_name": "Rookie Boot",
+      "archetype": "balanced",
+      "token_cost": 0,
+      "unlocked_by_default": true,
+      "stats": {
+        "kick_power": 70,
+        "free_kick_accuracy": 70,
+        "curve": 70,
+        "technique": 70,
+        "composure": 70,
+        "weak_foot": 60,
+        "preferred_foot": "right"
+      }
+    },
+    {
+      "id": "power_hammer",
+      "display_name": "Power Hammer",
+      "archetype": "power",
+      "token_cost": 40,
+      "unlocked_by_default": true,
+      "stats": {
+        "kick_power": 94,
+        "free_kick_accuracy": 58,
+        "curve": 48,
+        "technique": 62,
+        "composure": 55,
+        "weak_foot": 45,
+        "preferred_foot": "right"
+      }
+    },
+    {
+      "id": "curl_artist",
+      "display_name": "Curl Artist",
+      "archetype": "curl",
+      "token_cost": 55,
+      "unlocked_by_default": true,
+      "stats": {
+        "kick_power": 68,
+        "free_kick_accuracy": 78,
+        "curve": 96,
+        "technique": 88,
+        "composure": 74,
+        "weak_foot": 70,
+        "preferred_foot": "left"
+      }
+    },
+    {
+      "id": "knuckle_ghost",
+      "display_name": "Knuckle Ghost",
+      "archetype": "knuckle",
+      "token_cost": 60,
+      "unlocked_by_default": true,
+      "stats": {
+        "kick_power": 82,
+        "free_kick_accuracy": 72,
+        "curve": 35,
+        "technique": 90,
+        "composure": 80,
+        "weak_foot": 55,
+        "preferred_foot": "right"
+      }
+    },
+    {
+      "id": "placement_surgeon",
+      "display_name": "Placement Surgeon",
+      "archetype": "placement",
+      "token_cost": 50,
+      "unlocked_by_default": true,
+      "stats": {
+        "kick_power": 62,
+        "free_kick_accuracy": 95,
+        "curve": 72,
+        "technique": 92,
+        "composure": 88,
+        "weak_foot": 68,
+        "preferred_foot": "right"
+      }
+    },
+    {
+      "id": "ice_veins",
+      "display_name": "Ice Veins",
+      "archetype": "composure",
+      "token_cost": 45,
+      "unlocked_by_default": true,
+      "stats": {
+        "kick_power": 74,
+        "free_kick_accuracy": 80,
+        "curve": 70,
+        "technique": 76,
+        "composure": 98,
+        "weak_foot": 72,
+        "preferred_foot": "right"
+      }
+    },
+    {
+      "id": "two_footed",
+      "display_name": "Two-Footed Fox",
+      "archetype": "balanced",
+      "token_cost": 70,
+      "unlocked_by_default": true,
+      "stats": {
+        "kick_power": 76,
+        "free_kick_accuracy": 78,
+        "curve": 80,
+        "technique": 84,
+        "composure": 76,
+        "weak_foot": 96,
+        "preferred_foot": "left"
+      }
+    },
+    {
+      "id": "distance_cannon",
+      "display_name": "Distance Cannon",
+      "archetype": "power",
+      "token_cost": 65,
+      "unlocked_by_default": true,
+      "stats": {
+        "kick_power": 98,
+        "free_kick_accuracy": 64,
+        "curve": 58,
+        "technique": 70,
+        "composure": 66,
+        "weak_foot": 50,
+        "preferred_foot": "right"
+      }
+    },
+    {
+      "id": "wall_bender",
+      "display_name": "Wall Bender",
+      "archetype": "curl",
+      "token_cost": 80,
+      "unlocked_by_default": true,
+      "stats": {
+        "kick_power": 72,
+        "free_kick_accuracy": 84,
+        "curve": 92,
+        "technique": 86,
+        "composure": 82,
+        "weak_foot": 64,
+        "preferred_foot": "right"
+      }
+    },
+    {
+      "id": "street_technician",
+      "display_name": "Street Technician",
+      "archetype": "placement",
+      "token_cost": 75,
+      "unlocked_by_default": true,
+      "stats": {
+        "kick_power": 66,
+        "free_kick_accuracy": 88,
+        "curve": 84,
+        "technique": 97,
+        "composure": 78,
+        "weak_foot": 80,
+        "preferred_foot": "left"
+      }
+    }
+  ]
+}

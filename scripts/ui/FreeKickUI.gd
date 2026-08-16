@@ -6,6 +6,8 @@ const LEFT_SUPPORT_BOOT_TEXTURE := preload("res://assets/PumaAttacantoIZQ.png")
 signal restart_requested
 signal switch_foot_requested
 signal next_spot_requested
+signal prev_player_requested
+signal next_player_requested
 
 class ModernScoreHud:
 	extends Control
@@ -18,10 +20,14 @@ class ModernScoreHud:
 	var message := ""
 	var fallback_text := ""
 	var active_step := 0
+	var phase_fill := 0.0
+	var phase_time_text := ""
 	var _pulse := 0.0
+	const PHASE_LABELS := ["[1. POWER]", "[2. PLANT]", "[3. CONTACT]"]
+	const PHASE_CYAN := Color(0.0, 0.86, 1.0)
+	const PHASE_ORANGE := Color(1.0, 0.62, 0.18)
+	const PHASE_RED := Color(1.0, 0.25, 0.20)
 	var distance_to_goal: float = 24.0
-	var wind_speed: float = 0.0
-	var wind_direction_deg: float = 0.0
 
 	func _ready() -> void:
 		process_mode = Node.PROCESS_MODE_ALWAYS
@@ -50,33 +56,15 @@ class ModernScoreHud:
 		active_step = clampi(step, 0, 4)
 		queue_redraw()
 
-	func set_environment(distance: float, wind: Vector3) -> void:
-		distance_to_goal = distance
-		wind_speed = wind.length()
-		if wind_speed > 0.01:
-			wind_direction_deg = rad_to_deg(atan2(wind.x, -wind.z))
-		else:
-			wind_direction_deg = 0.0
+	func set_phase_progress(fill: float, time_text: String) -> void:
+		phase_fill = clampf(fill, 0.0, 1.0)
+		phase_time_text = time_text
 		queue_redraw()
 
-	func _wind_arrow() -> String:
-		var deg := fmod(wind_direction_deg + 360.0, 360.0)
-		if deg < 22.5 or deg >= 337.5:
-			return "\u2193"
-		elif deg < 67.5:
-			return "\u2199"
-		elif deg < 112.5:
-			return "\u2190"
-		elif deg < 157.5:
-			return "\u2196"
-		elif deg < 202.5:
-			return "\u2191"
-		elif deg < 247.5:
-			return "\u2197"
-		elif deg < 292.5:
-			return "\u2192"
-		else:
-			return "\u2198"
+	func set_distance(distance: float) -> void:
+		distance_to_goal = distance
+		queue_redraw()
+
 
 	func _draw() -> void:
 		var rect := Rect2(Vector2.ZERO, size)
@@ -95,9 +83,7 @@ class ModernScoreHud:
 		_draw_effectiveness(font, center_rect, effectiveness)
 		_draw_misses(font, right_rect)
 
-		_draw_stepper(font)
-		var footer := "SCORE AT LEAST ONCE IN 3 TRIALS" if message == "" else message.to_upper()
-		draw_string(font, Vector2(right_rect.position.x, right_rect.end.y + 6.0), footer, HORIZONTAL_ALIGNMENT_LEFT, right_rect.size.x, 13, Color(0.04, 0.86, 1.0, 0.95))
+		_draw_phase_bar(font)
 
 	func _draw_stadium_glass(rect: Rect2, glow: float) -> void:
 		var poly := PackedVector2Array([
@@ -131,25 +117,6 @@ class ModernScoreHud:
 		draw_line(Vector2(right_x + 3.0, row1_y - 1.5), Vector2(right_x + 3.0, row1_y + 2.5), Color(0.4, 0.85, 1.0, 0.5), 1.2)
 		draw_string(font, Vector2(right_x + 10.0, row1_y - 3.0), "DIST", HORIZONTAL_ALIGNMENT_LEFT, 30.0, 9, Color(0.55, 0.7, 0.85, 0.6))
 		draw_string(font, Vector2(right_x + 42.0, row1_y), "%.1f m" % distance_to_goal, HORIZONTAL_ALIGNMENT_LEFT, right_w - 42.0, 15, Color(0.78, 0.95, 1.0, 0.95))
-		var row2_y := row1_y + 24.0
-		if wind_speed < 0.3:
-			draw_arc(Vector2(right_x + 3.0, row2_y - 4.0), 2.8, 0.0, TAU, 16, Color(0.45, 0.85, 0.55, 0.8), 1.5)
-			draw_string(font, Vector2(right_x + 10.0, row2_y - 3.0), "WIND", HORIZONTAL_ALIGNMENT_LEFT, 30.0, 9, Color(0.5, 0.7, 0.8, 0.6))
-			draw_string(font, Vector2(right_x + 42.0, row2_y), "calm", HORIZONTAL_ALIGNMENT_LEFT, right_w - 42.0, 15, Color(0.55, 0.9, 0.6, 0.9))
-		else:
-			_draw_wind_arrow(Vector2(right_x + 5.0, row2_y - 4.0), wind_direction_deg, 9.0, Color(0.2, 0.82, 1.0, 0.9))
-			draw_string(font, Vector2(right_x + 10.0, row2_y - 3.0), "WIND", HORIZONTAL_ALIGNMENT_LEFT, 30.0, 9, Color(0.5, 0.7, 0.8, 0.6))
-			draw_string(font, Vector2(right_x + 42.0, row2_y), "%.1f" % wind_speed, HORIZONTAL_ALIGNMENT_LEFT, right_w - 42.0, 15, Color(0.25, 0.85, 1.0, 0.95))
-
-	func _draw_wind_arrow(origin: Vector2, direction_deg: float, length: float, color: Color) -> void:
-		var angle := deg_to_rad(direction_deg)
-		var dir := Vector2(sin(angle), -cos(angle))
-		var end := origin + dir * length
-		draw_line(origin, end, color, 2.0)
-		var head_size := 4.5
-		var head_angle := deg_to_rad(140.0)
-		draw_line(end, end - dir.rotated(head_angle) * head_size, color, 2.0)
-		draw_line(end, end - dir.rotated(-head_angle) * head_size, color, 2.0)
 
 	func _draw_effectiveness(font: Font, rect: Rect2, effectiveness: float) -> void:
 		draw_string(font, rect.position + Vector2(0.0, 21.0), "CONVERSION", HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 17, Color(1.0, 1.0, 1.0, 0.88))
@@ -194,25 +161,80 @@ class ModernScoreHud:
 		fill.corner_radius_bottom_right = 4
 		draw_style_box(fill, fill_rect)
 
-	func _draw_stepper(font: Font) -> void:
-		var labels := ["1 POWER", "2 PLANT", "3 CONTACT", "SHOT"]
-		var start_x := 204.0
-		var y := 142.0
-		var gap := 156.0
-		for i in range(labels.size()):
-			var step_index := i + 1
-			var center := Vector2(start_x + float(i) * gap, y)
-			var is_done := active_step > step_index
-			var is_active := active_step == step_index
-			var fill := Color(0.62, 1.0, 0.16, 0.92) if is_done else Color(0.04, 0.86, 1.0, 0.95) if is_active else Color(0.0, 0.0, 0.0, 0.30)
-			var stroke := Color(0.9, 1.0, 1.0, 0.95) if is_active else Color(1.0, 1.0, 1.0, 0.28)
-			draw_circle(center, 10.0, fill)
-			draw_arc(center, 10.0, 0.0, TAU, 32, stroke, 1.4)
-			if i < labels.size() - 1:
-				var next_center := Vector2(start_x + float(i + 1) * gap, y)
-				var line_color := Color(0.62, 1.0, 0.16, 0.72) if is_done else Color(1.0, 1.0, 1.0, 0.18)
-				draw_line(center + Vector2(14.0, 0.0), next_center - Vector2(14.0, 0.0), line_color, 2.0)
-			draw_string(font, center + Vector2(-50.0, 27.0), labels[i], HORIZONTAL_ALIGNMENT_CENTER, 100.0, 11, Color(1.0, 1.0, 1.0, 0.76))
+	func _draw_phase_bar(font: Font) -> void:
+		var bar_pos := Vector2(230.0, 150.0)
+		var bar_size := Vector2(480.0, 18.0)
+		var gap := 4.0
+		var seg_w := (bar_size.x - gap * 2.0) / 3.0
+		var bar_rect := Rect2(bar_pos, bar_size)
+		draw_rect(bar_rect, Color(0.02, 0.03, 0.06, 0.55), true)
+		draw_rect(bar_rect, Color(1.0, 1.0, 1.0, 0.16), false, 1.0)
+		var low_time := active_step >= 2 and phase_time_text != "" and phase_fill < 0.30
+		for i in range(3):
+			var step := i + 1
+			var is_done := active_step > step
+			var is_active := active_step == step
+			var seg_rect := Rect2(bar_pos + Vector2(float(i) * (seg_w + gap), 1.0), Vector2(seg_w, bar_size.y - 2.0))
+			var fill := 1.0 if is_done else phase_fill if is_active else 0.0
+			if fill > 0.01:
+				var fill_color := PHASE_CYAN if is_done else PHASE_RED if is_active and low_time else PHASE_ORANGE
+				var fill_rect := Rect2(seg_rect.position, Vector2(seg_rect.size.x * clampf(fill, 0.0, 1.0), seg_rect.size.y))
+				draw_rect(fill_rect, fill_color, true)
+				if is_active and step >= 2 and fill < 0.995:
+					var cursor_x := fill_rect.end.x
+					draw_line(Vector2(cursor_x, seg_rect.position.y - 1.0), Vector2(cursor_x, seg_rect.end.y + 1.0), Color(0.0, 0.95, 1.0, 0.95), 2.0)
+			if i < 2:
+				var chevron_center := Vector2(seg_rect.end.x + gap * 0.5, bar_rect.get_center().y)
+				draw_colored_polygon(PackedVector2Array([chevron_center + Vector2(-3.0, -4.0), chevron_center + Vector2(3.0, 0.0), chevron_center + Vector2(-3.0, 4.0)]), Color(1.0, 1.0, 1.0, 0.30))
+			var label_color := PHASE_ORANGE if is_active else PHASE_CYAN if is_done else Color(1.0, 1.0, 1.0, 0.35)
+			draw_string(font, Vector2(seg_rect.position.x, bar_pos.y - 8.0), PHASE_LABELS[i], HORIZONTAL_ALIGNMENT_CENTER, seg_w, 10, label_color)
+		if phase_time_text != "":
+			var text_color := PHASE_RED if low_time else PHASE_ORANGE
+			if low_time:
+				text_color.a = 0.65 + 0.35 * sin(_pulse * 9.0)
+			draw_string(font, Vector2(bar_rect.end.x + 10.0, bar_rect.get_center().y + 5.0), phase_time_text, HORIZONTAL_ALIGNMENT_LEFT, 64.0, 15, text_color)
+
+class WindHud extends Control:
+	var wind_speed := 0.0
+	var wind_direction_deg := 0.0
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func set_wind(wind: Vector3) -> void:
+		wind_speed = wind.length()
+		if wind_speed > 0.01:
+			wind_direction_deg = rad_to_deg(atan2(wind.x, -wind.z))
+		else:
+			wind_direction_deg = 0.0
+		queue_redraw()
+
+	func _draw() -> void:
+		var font := get_theme_default_font()
+		var rect := Rect2(Vector2.ZERO, size)
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color(0.0, 0.01, 0.03, 0.55)
+		style.border_color = Color(0.0, 0.85, 1.0, 0.45)
+		style.set_border_width_all(1)
+		style.set_corner_radius_all(8)
+		draw_style_box(style, rect)
+		draw_string(font, Vector2(12.0, 18.0), "WIND", HORIZONTAL_ALIGNMENT_LEFT, 60.0, 10, Color(0.55, 0.7, 0.85, 0.65))
+		if wind_speed < 0.3:
+			draw_string(font, Vector2(12.0, 50.0), "calm", HORIZONTAL_ALIGNMENT_LEFT, 60.0, 16, Color(0.55, 0.9, 0.6, 0.9))
+		else:
+			_draw_wind_arrow(Vector2(30.0, 46.0), wind_direction_deg, 14.0)
+			draw_string(font, Vector2(48.0, 51.0), "%.1f m/s" % wind_speed, HORIZONTAL_ALIGNMENT_LEFT, 100.0, 16, Color(0.25, 0.85, 1.0, 0.95))
+
+	func _draw_wind_arrow(origin: Vector2, direction_deg: float, length: float) -> void:
+		var angle := deg_to_rad(direction_deg)
+		var dir := Vector2(sin(angle), -cos(angle))
+		var end := origin + dir * length
+		var color := Color(0.25, 0.85, 1.0, 0.9)
+		draw_line(origin, end, color, 2.0)
+		var head_size := 5.0
+		var head_angle := deg_to_rad(140.0)
+		draw_line(end, end - dir.rotated(head_angle) * head_size, color, 2.0)
+		draw_line(end, end - dir.rotated(-head_angle) * head_size, color, 2.0)
 
 @onready var power_label: Label = %PowerLabel
 @onready var power_bar: ProgressBar = %PowerBar
@@ -228,6 +250,10 @@ class ModernScoreHud:
 @onready var switch_foot_button: Button = %SwitchFootButton
 @onready var next_spot_button: Button = %NextSpotButton
 
+var prev_player_button: Button
+var next_player_button: Button
+var player_profile_label: Label
+
 var kicking_foot := "right"
 var support_marker_hint: Control
 var support_zone_overlay: Control
@@ -238,16 +264,31 @@ var support_zone_marker_local := Vector2.ZERO
 var support_zone_has_marker := false
 var support_zone_aim_target := 0.0
 var support_zone_show_angle := false
+var goal_banner: Control
+var goal_banner_tween: Tween
+var goal_banner_text := "GOAL!"
+var goal_banner_subtitle := ""
+var goal_banner_color := Color(0.0, 0.95, 1.0)
+var goal_banner_progress := 0.0
+var goal_banner_alpha := 1.0
+var wind_module: Control
 
 func _ready() -> void:
 	left_support_boot_texture = LEFT_SUPPORT_BOOT_TEXTURE
 	support_zone_overlay = _create_support_zone_overlay()
 	support_marker_hint = _create_support_marker_hint()
+	goal_banner = _create_goal_banner()
+	wind_module = _create_wind_module()
+	_create_player_selector()
 	_apply_mvp_layout()
 	_center_score_hud()
 	restart_button.pressed.connect(func() -> void: restart_requested.emit())
 	switch_foot_button.pressed.connect(func() -> void: switch_foot_requested.emit())
 	next_spot_button.pressed.connect(func() -> void: next_spot_requested.emit())
+	if prev_player_button != null:
+		prev_player_button.pressed.connect(func() -> void: prev_player_requested.emit())
+	if next_player_button != null:
+		next_player_button.pressed.connect(func() -> void: next_player_requested.emit())
 
 func hide_all() -> void:
 	power_label.visible = false
@@ -271,6 +312,11 @@ func _set_active_step(step: int) -> void:
 	if score_hud != null and score_hud.has_method("set_active_step"):
 		score_hud.call("set_active_step", step)
 
+## Shows the active phase bar segment fill (0..1) and an optional time/percent label.
+func set_phase_progress(fill: float, time_text: String = "") -> void:
+	if score_hud != null and score_hud.has_method("set_phase_progress"):
+		score_hud.call("set_phase_progress", fill, time_text)
+
 func set_spot_label(label: String) -> void:
 	if next_spot_button != null:
 		next_spot_button.text = "Spot: %s" % label
@@ -284,8 +330,37 @@ func set_run_hud(level: int, goals: int, attempts: int, misses: int, max_misses:
 		score_hud.call("set_stats", level, goals, attempts, misses, max_misses, message)
 
 func set_environment_info(distance: float, wind: Vector3) -> void:
-	if score_hud != null and score_hud.has_method("set_environment"):
-		score_hud.call("set_environment", distance, wind)
+	if score_hud != null and score_hud.has_method("set_distance"):
+		score_hud.call("set_distance", distance)
+	if wind_module != null and wind_module.has_method("set_wind"):
+		wind_module.call("set_wind", wind)
+
+func set_player_profile_info(profile: FreeKickPlayerProfile) -> void:
+	if player_profile_label == null or profile == null:
+		return
+	var stats := profile.ensure_stats()
+	player_profile_label.text = "%s  ·  %s  ·  PWR %d  ACC %d  CRV %d  TEC %d" % [
+		profile.display_name,
+		profile.archetype.to_upper(),
+		roundi(stats.kick_power),
+		roundi(stats.free_kick_accuracy),
+		roundi(stats.curve),
+		roundi(stats.technique),
+	]
+
+func _create_player_selector() -> void:
+	var root := get_node_or_null("Root") as Control
+	var parent: Node = root if root != null else self
+	prev_player_button = Button.new()
+	prev_player_button.name = "PrevPlayerButton"
+	parent.add_child(prev_player_button)
+	next_player_button = Button.new()
+	next_player_button.name = "NextPlayerButton"
+	parent.add_child(next_player_button)
+	player_profile_label = Label.new()
+	player_profile_label.name = "PlayerProfileLabel"
+	player_profile_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	parent.add_child(player_profile_label)
 
 func _create_support_zone_overlay() -> Control:
 	var root := get_node_or_null("Root") as Control
@@ -357,6 +432,96 @@ func _create_support_marker_hint() -> Control:
 		add_child(marker)
 	return marker
 
+func _create_goal_banner() -> Control:
+	var root := get_node_or_null("Root") as Control
+	var banner := Control.new()
+	banner.name = "GoalBanner"
+	banner.set_anchors_preset(Control.PRESET_FULL_RECT)
+	banner.visible = false
+	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner.draw.connect(_draw_goal_banner)
+	if root != null:
+		root.add_child(banner)
+	else:
+		add_child(banner)
+	return banner
+
+func _create_wind_module() -> Control:
+	var root := get_node_or_null("Root") as Control
+	var hud := WindHud.new()
+	hud.name = "WindHud"
+	hud.size = Vector2(156.0, 78.0)
+	hud.set_anchors_preset(Control.PRESET_CENTER_LEFT)
+	hud.position = Vector2(22.0, -46.0)
+	if root != null:
+		root.add_child(hud)
+	else:
+		add_child(hud)
+	return hud
+
+## Pops a result banner (goal, miss, save, post, crossbar). Deterministic tween, no RNG.
+func show_result_banner(text: String = "GOAL!", subtitle: String = "", highlight: Color = Color(0.0, 0.95, 1.0)) -> void:
+	if goal_banner == null:
+		return
+	goal_banner_text = text
+	goal_banner_subtitle = subtitle
+	goal_banner_color = highlight
+	goal_banner_progress = 0.0
+	goal_banner_alpha = 1.0
+	goal_banner.visible = true
+	goal_banner.queue_redraw()
+	if goal_banner_tween != null and goal_banner_tween.is_valid():
+		goal_banner_tween.kill()
+	goal_banner_tween = create_tween()
+	goal_banner_tween.tween_method(_set_goal_banner_progress, 0.0, 1.0, 0.42).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	goal_banner_tween.tween_interval(1.05)
+	goal_banner_tween.tween_method(_set_goal_banner_alpha, 1.0, 0.0, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	goal_banner_tween.tween_callback(func() -> void:
+		goal_banner.visible = false
+	)
+
+func _set_goal_banner_progress(value: float) -> void:
+	goal_banner_progress = value
+	if goal_banner != null:
+		goal_banner.queue_redraw()
+
+func _set_goal_banner_alpha(value: float) -> void:
+	goal_banner_alpha = value
+	if goal_banner != null:
+		goal_banner.queue_redraw()
+
+func _draw_goal_banner() -> void:
+	var banner := goal_banner
+	if banner == null or not banner.visible:
+		return
+	var center := banner.size * Vector2(0.5, 0.34)
+	var pop := clampf(goal_banner_progress, 0.0, 1.4)
+	var alpha := clampf(goal_banner_alpha, 0.0, 1.0)
+	# Expanding celebration rings, deterministic from the pop progress.
+	for i in 2:
+		var ring_radius := 46.0 + pop * (150.0 + float(i) * 52.0)
+		var ring_alpha := maxf(0.0, (1.0 - pop) * 0.5) * alpha
+		if ring_alpha > 0.01:
+			banner.draw_arc(center, ring_radius, 0.0, TAU, 48, Color(goal_banner_color, ring_alpha), 2.5)
+	var scale_factor := 0.42 + 0.58 * pop
+	var panel_size := Vector2(430.0, 134.0) * scale_factor
+	var panel_rect := Rect2(center - panel_size * 0.5, panel_size)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.0, 0.01, 0.03, 0.34 * alpha)
+	style.border_color = Color(goal_banner_color, 0.55 * alpha)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(12)
+	banner.draw_style_box(style, panel_rect)
+	var font := banner.get_theme_default_font()
+	var title_size := roundi(74.0 * scale_factor)
+	var title_y := panel_rect.position.y + panel_rect.size.y * 0.46
+	banner.draw_string(font, Vector2(0.0, title_y), goal_banner_text, HORIZONTAL_ALIGNMENT_CENTER, banner.size.x, title_size, Color(goal_banner_color.darkened(0.45), 0.5 * alpha))
+	banner.draw_string(font, Vector2(0.0, title_y - 2.0), goal_banner_text, HORIZONTAL_ALIGNMENT_CENTER, banner.size.x, title_size, Color(goal_banner_color, alpha))
+	var accent_y := panel_rect.position.y + panel_rect.size.y * 0.64
+	banner.draw_rect(Rect2(Vector2(panel_rect.position.x + 48.0 * scale_factor, accent_y), Vector2(panel_rect.size.x - 96.0 * scale_factor, 2.0)), Color(goal_banner_color, 0.85 * alpha), true)
+	if goal_banner_subtitle != "":
+		banner.draw_string(font, Vector2(0.0, panel_rect.end.y - 18.0 * scale_factor), goal_banner_subtitle, HORIZONTAL_ALIGNMENT_CENTER, banner.size.x, roundi(16.0 * scale_factor), Color(1.0, 1.0, 1.0, 0.92 * alpha))
+
 func _create_score_hud() -> Control:
 	var root := get_node_or_null("Root") as Control
 	var hud := ModernScoreHud.new()
@@ -391,12 +556,14 @@ func _support_foot_for_kick(kicking_foot: String) -> String:
 func show_power_ready() -> void:
 	hide_all()
 	_set_active_step(1)
+	set_phase_progress(0.0, "")
 	_position_power_meter_for_foot()
 	_show_primary_instruction("Choose kicking foot", "Tap left or right side, then hold to charge power.")
 	set_status("POWER - choose kicking foot")
 
 func show_power(power_value: float) -> void:
 	_set_active_step(1)
+	set_phase_progress(power_value, "%d%%" % roundi(power_value * 100.0))
 	_position_power_meter_for_foot()
 	power_label.visible = false
 	power_meter.visible = true
@@ -408,6 +575,7 @@ func show_power(power_value: float) -> void:
 func show_support_foot_sector(selected_foot: String, _difficulty: FreeKickDifficulty) -> void:
 	hide_all()
 	_set_active_step(2)
+	set_phase_progress(1.0, "")
 	var support_foot := _support_foot_for_kick(selected_foot)
 	power_label.visible = false
 	power_meter.visible = false
@@ -456,9 +624,15 @@ func update_support_foot_angle(angle: float, aim_target: float = 0.0) -> void:
 	feedback_label.text = "Aim: %s - foot %+.0f deg" % [target_label, foot_offset]
 	set_status("Aim %s - drag left/right, release to shoot setup" % target_label)
 
+## Shows how much aim angle the current plant distance allows (0..1).
+func update_support_angle_scale(scale: float) -> void:
+	if support_panel.visible:
+		support_panel.set_angle_scale(scale)
+
 func show_ball_contact_ui() -> void:
 	hide_all()
 	_set_active_step(3)
+	set_phase_progress(1.0, "")
 	power_label.visible = false
 	ball_panel.visible = true
 	ball_panel.modulate = Color(1.0, 1.0, 1.0, 0.92)
@@ -541,6 +715,7 @@ func align_ball_contact_overlay(ball: Node3D, camera: Camera3D, world_radius: fl
 func show_feedback(report: Resource, auto_restart_delay_seconds: float = 4.0) -> void:
 	hide_all()
 	_set_active_step(4)
+	set_phase_progress(1.0, "")
 	feedback_label.visible = true
 	feedback_label.position = Vector2(24.0, 370.0)
 	feedback_label.size = Vector2(760.0, 210.0)
@@ -585,6 +760,11 @@ func _format_feedback_report(report: Resource) -> String:
 
 func set_status(text: String) -> void:
 	status_label.text = text
+
+func show_game_over(text: String) -> void:
+	instruction_label.text = text
+	instruction_label.visible = true
+	status_label.visible = false
 
 func _show_primary_instruction(action: String, consequence: String) -> void:
 	instruction_label.visible = true
@@ -635,6 +815,20 @@ func _apply_mvp_layout() -> void:
 	switch_foot_button.visible = false
 	_style_button(next_spot_button, Vector2(214.0, 586.0), Vector2(196.0, 40.0), next_spot_button.text)
 	next_spot_button.visible = false
+	_style_button(prev_player_button, Vector2(820.0, 586.0), Vector2(64.0, 40.0), "<")
+	_style_button(next_player_button, Vector2(1196.0, 586.0), Vector2(64.0, 40.0), ">")
+	if player_profile_label != null:
+		player_profile_label.position = Vector2(892.0, 582.0)
+		player_profile_label.size = Vector2(296.0, 48.0)
+		player_profile_label.add_theme_font_size_override("font_size", 12)
+		player_profile_label.add_theme_color_override("font_color", Color(0.82, 0.95, 1.0, 0.9))
+		player_profile_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		player_profile_label.text = "Player"
+		player_profile_label.visible = true
+	if prev_player_button != null:
+		prev_player_button.visible = true
+	if next_player_button != null:
+		next_player_button.visible = true
 
 func align_power_meter_to_ball(ball: Node3D, camera: Camera3D) -> void:
 	if ball == null or camera == null or power_meter == null:

@@ -18,7 +18,7 @@ func _process(delta: float) -> void:
 	if charging:
 		hold_time += delta
 		controller.input_data.hold_time = hold_time
-		controller.input_data.power_normalized = ShotCalculator.power_from_hold(hold_time)
+		controller.input_data.power_normalized = ShotCalculator.power_from_hold(hold_time, controller.stats)
 		controller.ui.show_power(controller.input_data.power_normalized)
 
 func _input(event: InputEvent) -> void:
@@ -30,7 +30,8 @@ func _input(event: InputEvent) -> void:
 	elif charging and _is_power_release(event):
 		charging = false
 		controller.input_data.hold_time = hold_time
-		controller.input_data.power_normalized = ShotCalculator.power_from_hold(hold_time)
+		controller.input_data.power_normalized = ShotCalculator.power_from_hold(hold_time, controller.stats)
+		controller.set_power_time_budget(controller.input_data.power_normalized)
 		finished.emit(&"SupportFootState")
 		get_viewport().set_input_as_handled()
 

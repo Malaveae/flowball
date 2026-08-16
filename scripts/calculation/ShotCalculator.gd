@@ -9,6 +9,13 @@ const MAX_SPIN_RATE := 140.0
 const MAX_HORIZONTAL_OFFSET_DEG := 25.0
 const IDEAL_POWER_MAX := 0.85
 
+# Step 1 power curve (sigmoid). The ideal window width follows control stats;
+# the time to reach the ideal point follows kick_power.
+const POWER_CURVE_CENTER_MIN := 0.85  # max-power players: ideal reached fastest
+const POWER_CURVE_CENTER_MAX := 1.30  # low-power players: ideal reached slower
+const POWER_CURVE_SMOOTH_MIN := 0.12  # low-control: steep, tiny ideal window
+const POWER_CURVE_SMOOTH_MAX := 0.38  # high-control: wide ideal window
+
 static func calculate(
 	input: FreeKickInputData,
 	stats: PlayerFreeKickStats,
@@ -43,8 +50,11 @@ static func calculate(
 	var foot_angle_offset := _support_aim_target_offset(input.support_aim_target)
 	# Support foot side is physical placement. It should not aim the shot directly anymore.
 	# Aim is fine-tuned by foot angle; curl/contact comes later in Step 3.
+	# Plant distance gates how much aim angle is available: the optimal plant band
+	# keeps the full lane, a cramped or overextended plant narrows it.
+	var angle_scale := support_angle_scale(input.support_vector)
 	params.horizontal_angle = clampf(
-		foot_angle_offset,
+		foot_angle_offset * angle_scale,
 		-MAX_HORIZONTAL_OFFSET_DEG,
 		MAX_HORIZONTAL_OFFSET_DEG
 	)
@@ -53,8 +63,29 @@ static func calculate(
 	var swipe_vector := _swipe_vector(input.swipe_points)
 	params.spin_axis = _spin_axis_from_contact_and_swipe(input.impact_point, swipe_vector, input.selected_foot)
 	params.spin_rate = _spin_rate(input, swipe_vector.length(), curve_stat, technique)
+	# Power pressure: over-power damps curl so full-power strikes favor puntera/knuckleball.
+	params.spin_rate *= difficulty.spin_power_factor(input.power_normalized)
 
-	params.error_cone_degrees = _error_cone(accuracy, technique, params.stability, overpower, weak_foot_penalty, timeout_penalty_value)
+	# Step 3 gesture (estado3_trazado_roce.md): classify the trace into a technique and
+	# score execution quality. Default contact (timer expired) keeps the legacy blind shot.
+	var gesture := ContactGesture.analyze(input.swipe_points, input.swipe_duration)
+	var gesture_l_max := ContactGesture.l_max(params.power, curve_stat, difficulty)
+	var gesture_tech := ContactGesture.classify(gesture, params.power, curve_stat, gesture_l_max, input.selected_foot)
+	var gesture_quality := ContactGesture.quality(gesture, gesture_tech, input.selected_foot)
+	params.gesture_technique = gesture_tech
+	params.gesture_quality = gesture_quality
+	params.gesture_l_max = gesture_l_max
+	var quality_dispersion := 0.0
+	if not input.used_default_contact:
+		params.spin_rate *= _technique_spin_factor(gesture_tech)
+		params.spin_rate *= 0.5 + 0.5 * gesture_quality
+		params.spin_rate = clampf(params.spin_rate, 0.0, MAX_SPIN_RATE)
+		params.spin_axis = _technique_axis_adjust(params.spin_axis, gesture_tech)
+		params.elevation_angle = clampf(params.elevation_angle + _technique_elevation_adjust(gesture_tech), MIN_ELEVATION_DEG, MAX_ELEVATION_DEG)
+		quality_dispersion = _quality_dispersion(gesture_quality, composure, gesture_tech)
+	params.quality_dispersion_degrees = quality_dispersion
+
+	params.error_cone_degrees = _error_cone(accuracy, technique, params.stability, overpower, weak_foot_penalty, timeout_penalty_value) + quality_dispersion
 	params.final_error = _deterministic_error(input, params.error_cone_degrees)
 	params.horizontal_angle += params.final_error.x
 	params.elevation_angle = clampf(params.elevation_angle + params.final_error.y, MIN_ELEVATION_DEG, MAX_ELEVATION_DEG)
@@ -64,8 +95,27 @@ static func calculate(
 	params.shot_type = _classify_shot(params, swipe_vector)
 	return params
 
-static func power_from_hold(hold_time: float, charge_tau: float = 0.75) -> float:
-	return clampf(1.0 - exp(-maxf(0.0, hold_time) / charge_tau), 0.0, 1.0)
+## Step 1 hold curve: a sigmoid whose shape follows the player's stats.
+## - Smoothness (window width) scales with control (accuracy/technique/composure):
+##   a control player can land the ideal power more easily.
+## - Center (where the slope is steepest) scales with kick_power:
+##   a power player reaches the ideal point sooner, trading window for speed.
+static func power_from_hold(hold_time: float, stats: PlayerFreeKickStats) -> float:
+	if stats == null:
+		stats = PlayerFreeKickStats.new()
+	var control := (stats.normalized(stats.free_kick_accuracy)
+		+ stats.normalized(stats.technique)
+		+ stats.normalized(stats.composure)) / 3.0
+	var power_stat := stats.normalized(stats.kick_power)
+	var center := lerpf(POWER_CURVE_CENTER_MAX, POWER_CURVE_CENTER_MIN, power_stat)
+	var smooth := lerpf(POWER_CURVE_SMOOTH_MIN, POWER_CURVE_SMOOTH_MAX, control)
+	return _sigmoid_hold(hold_time, center, smooth)
+
+static func _sigmoid_hold(t: float, t0: float, s: float) -> float:
+	# Normalized so power(0) = 0 and power(inf) = 1.
+	var sig_start := 1.0 / (1.0 + exp(t0 / s))
+	var sig_now := 1.0 / (1.0 + exp(-(t - t0) / s))
+	return clampf((sig_now - sig_start) / (1.0 - sig_start), 0.0, 1.0)
 
 static func _launch_speed(power: float, power_stat: float, distance: float, support_quality: float, step2_to_step3_ms: int = 0) -> float:
 	var distance_bonus := clampf((distance - 18.0) / 22.0, 0.0, 0.25)
@@ -103,6 +153,22 @@ static func _support_curve_bias(aim_target: float, support_quality: float) -> fl
 	if open_amount < 0.25:
 		return 0.0
 	return clampf((open_amount - 0.25) / 0.75, 0.0, 1.0) * clampf(support_quality, 0.0, 1.0) * 0.18
+
+static func support_angle_scale(support_vector: Vector2) -> float:
+	# Plant distance controls rotational freedom (the biomechanical anchor):
+	# the optimal plant band (0.20-0.35 normalized) keeps the full aim angle;
+	# too close (cramped, foot crowding the ball) or too far (overextended,
+	# lunging) narrows how far the shooter can open the shot.
+	# Bands mirror _support_quality in SupportFootState (piedeapoyo.md).
+	var distance := support_vector.length()
+	if distance < 0.20:
+		# Cramped: the marker clamp floors at ~0.18, so this band is steep.
+		return lerpf(0.40, 1.0, clampf((distance - 0.18) / 0.02, 0.0, 1.0))
+	if distance <= 0.35:
+		return 1.0
+	if distance <= 0.55:
+		return lerpf(1.0, 0.60, (distance - 0.35) / 0.20)
+	return lerpf(0.55, 0.25, clampf((distance - 0.55) / 0.45, 0.0, 1.0))
 
 static func _support_aim_target_offset(target: float) -> float:
 	# Step 2 substep B: the foot points at a target lane, independent of support-foot side.
@@ -205,3 +271,57 @@ static func _classify_shot(params: ShotParams, swipe: Vector2) -> StringName:
 	if params.elevation_angle > 22.0:
 		return &"lifted"
 	return &"balanced"
+
+static func _technique_spin_factor(tech: ContactGesture.Technique) -> float:
+	# Doc section 2: technique scales how much effect the gesture can impart.
+	match tech:
+		ContactGesture.Technique.INSTEP:
+			return 1.25
+		ContactGesture.Technique.OUTSTEP:
+			return 1.15
+		ContactGesture.Technique.LACE_LONG:
+			return 1.05
+		ContactGesture.Technique.PUNTERA:
+			return 0.35
+		ContactGesture.Technique.DIRTY:
+			return 0.85
+	return 1.0
+
+static func _technique_axis_adjust(axis: Vector3, tech: ContactGesture.Technique) -> Vector3:
+	var result := axis
+	match tech:
+		ContactGesture.Technique.INSTEP:
+			result.y *= 1.35
+		ContactGesture.Technique.OUTSTEP:
+			result.y *= 1.2
+		ContactGesture.Technique.TOPSPIN:
+			result.x = -absf(result.x)  # topspin: Magnus pulls the ball down late (dip)
+		ContactGesture.Technique.BACKSPIN:
+			result.x = absf(result.x)  # backspin: the ball floats
+	return result.normalized() if result.length() > 0.001 else Vector3.ZERO
+
+static func _technique_elevation_adjust(tech: ContactGesture.Technique) -> float:
+	match tech:
+		ContactGesture.Technique.TOPSPIN:
+			return -3.0
+		ContactGesture.Technique.BACKSPIN:
+			return 2.0
+		ContactGesture.Technique.PUNTERA:
+			return 1.5
+		ContactGesture.Technique.LACE_LONG:
+			return -1.0
+		ContactGesture.Technique.INSTEP, ContactGesture.Technique.OUTSTEP:
+			return -1.0
+	return 0.0
+
+static func _quality_dispersion(gesture_quality: float, composure: float, tech: ContactGesture.Technique) -> float:
+	# Doc section 5: dispersión_extra = (1 - calidad) x 2deg x (1 - PRE/200).
+	# PRE maps to the player's composure (0..1). Puntera is inherently unpredictable;
+	# dirty signatures spread even more.
+	var base := (1.0 - gesture_quality) * 2.0 * (1.0 - composure * 0.5)
+	match tech:
+		ContactGesture.Technique.PUNTERA:
+			base += 2.0
+		ContactGesture.Technique.DIRTY:
+			base += 1.5
+	return base

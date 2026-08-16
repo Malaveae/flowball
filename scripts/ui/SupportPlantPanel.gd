@@ -13,6 +13,7 @@ var has_marker: bool = false
 var foot_angle: float = 0.0
 var has_foot_angle: bool = false
 var aim_target: float = 0.0
+var angle_scale: float = 1.0
 var substep_label: String = "1/2: choose foot location"
 
 func set_foot(foot: String) -> void:
@@ -28,6 +29,12 @@ func set_foot_angle(angle: float, active: bool = true, target: float = 0.0) -> v
 	foot_angle = angle
 	aim_target = clampf(target, -1.0, 1.0)
 	has_foot_angle = active
+	queue_redraw()
+
+## Visualizes the aim-angle range available at the current plant distance:
+## 1.0 = optimal plant keeps the full lane, lower values = cramped/overextended.
+func set_angle_scale(scale: float) -> void:
+	angle_scale = clampf(scale, 0.0, 1.0)
 	queue_redraw()
 
 func set_substep_label(text: String) -> void:
@@ -93,8 +100,11 @@ func _draw_distance_rings(center: Vector2) -> void:
 
 func _draw_aim_lanes(center: Vector2) -> void:
 	var aim_ray_length := sector_radius * 0.86
+	# Lane spread follows the plant-distance angle scale: optimal plant = full
+	# lane, cramped/overextended = lanes collapse toward center.
+	var spread := lerpf(0.22, 1.0, angle_scale)
 	for lane in [-1, 0, 1]:
-		var angle := deg_to_rad(float(lane) * 30.0)
+		var angle := deg_to_rad(float(lane) * 30.0 * spread)
 		var end := center + Vector2.UP.rotated(angle) * aim_ray_length
 		var color := Color(0.35, 0.9, 1.0, 0.62) if lane == 0 else Color(1.0, 1.0, 1.0, 0.28)
 		draw_line(center, end, color, 2.5)

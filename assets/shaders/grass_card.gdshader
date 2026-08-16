@@ -1,10 +1,16 @@
 shader_type spatial;
-render_mode diffuse_burley, specular_schlick_ggx, cull_disabled;
+render_mode diffuse_burley, specular_schlick_ggx, cull_disabled, depth_draw_never;
 
 // --- Textures ---
 uniform sampler2D blade_tex : source_color;
 uniform sampler2D blade_normal_tex : hint_normal;
 uniform sampler2D wind_noise_tex;
+
+// --- Atlas layout ---
+// The blade texture is a horizontal strip of N slots. QuadMesh UVs put the
+// blade TIP at UV.y=0 and the BASE at UV.y=1 (verified empirically), so the
+// atlas is authored tip-up. Vertex picks a slot by per-blade seed.
+uniform int atlas_slots : hint_range(1, 16) = 8;
 
 // --- Tuning ---
 uniform float alpha_cutoff : hint_range(0.01, 0.95) = 0.35;
@@ -49,6 +55,14 @@ uniform float patch_noise_strength : hint_range(0.0, 0.5) = 0.12;
 
 // --- Accent grass ---
 uniform float accent_probability : hint_range(0.0, 0.5) = 0.16;
+
+// --- Roystan grass technique (roystan.net/articles/grass-shader) ---
+// Thin blades transmit light: blades whose back faces the light still
+// receive a floor of illumination. Applied in the custom light() below.
+uniform float translucency_gain : hint_range(0.0, 1.0) = 0.4;
+// Per-blade forward curve (BladeForward/BladeCurve): each blade leans
+// along its own axis, curving more toward the tip (quadratic).
+uniform float blade_forward : hint_range(0.0, 1.0) = 0.3;
 
 // World-space blade root position, passed from vertex so fragment noise
 // stays pinned to the pitch (fragment VERTEX is view-space in Godot 4).
@@ -96,7 +110,7 @@ vec4 accent_attrs(float s) {
 }
 
 void vertex() {
-	float height = UV.y;
+	float height = 1.0 - UV.y;  // QuadMesh: UV.y=0 is the tip, UV.y=1 the base
 
 	vec3 model_world = (MODEL_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
 	world_pos = model_world;
@@ -115,8 +129,9 @@ void vertex() {
 	}
 
 	// --- Sprite variation ---
-	float sprite_pick = floor(hash(seed + 6.0) * 3.0);
-	UV = vec2(sprite_pick * (1.0 / 3.0) + UV.x * (1.0 / 3.0), UV.y);
+	float slot_count = float(atlas_slots);
+	float sprite_pick = floor(hash(seed + 6.0) * slot_count);
+	UV = vec2(sprite_pick * (1.0 / slot_count) + UV.x * (1.0 / slot_count), UV.y);
 
 	// --- Accent grass ---
 	vec4 accent = accent_attrs(seed);
@@ -139,6 +154,12 @@ void vertex() {
 	float bend_angle = (bend_seed - 0.5) * 0.15;
 	VERTEX.x += sin(bend_angle) * height * 0.05;
 	VERTEX.z += cos(bend_angle) * height * 0.03;
+
+	// --- Roystan-style forward blade curve ---
+	// Quadratic lean along the billboard's camera-facing axis: base anchored,
+	// tip leaning furthest (BladeForward/BladeCurve from the article).
+	float forward_lean = (bend_seed - 0.5) * blade_forward;
+	VERTEX.z += forward_lean * height * height * 0.35;
 
 	VERTEX.y *= height_variation;
 
@@ -238,9 +259,9 @@ void fragment() {
 	color.g += accent_g;
 
 	// --- Blade-level ambient occlusion ---
-	// Base of blade (UV.y ≈ 0) is shadowed by ground and neighbor blades.
-	// Tip (UV.y ≈ 1) receives full light.
-	float blade_ao = mix(0.68, 1.0, pow(UV.y, 0.55));
+	// Base of blade (UV.y ≈ 1) is shadowed by ground and neighbor blades.
+	// Tip (UV.y ≈ 0) receives full light.
+	float blade_ao = mix(0.68, 1.0, pow(1.0 - UV.y, 0.55));
 
 	// --- Edge transmission (subtle backlight glow at blade edges) ---
 	// Thin grass blades let a bit of light through at the silhouette.
@@ -251,6 +272,21 @@ void fragment() {
 	NORMAL_MAP = normal_tex;
 
 	// Roughness: slightly smoother near tip, rougher near base (occlusion+dirt).
-	ROUGHNESS = mix(0.88, 0.76, pow(UV.y, 0.5));
+	ROUGHNESS = mix(0.88, 0.76, pow(1.0 - UV.y, 0.5));
 	SPECULAR = 0.15;
+}
+
+// ───────────────────────────────────────────────
+// Custom light: Roystan-style translucent grass
+// ───────────────────────────────────────────────
+// Thin grass transmits light: blades whose back faces the light still receive
+// a floor of illumination (translucency_gain). Shadow attenuation keeps the
+// blades readable in shadow while the glow prevents them from going black.
+// Mirrors the article's NdotL = saturate(saturate(dot(N,L)) + gain) * shadow.
+void light() {
+	float ndotl = max(dot(NORMAL, LIGHT), 0.0) + translucency_gain;
+	ndotl = clamp(ndotl, 0.0, 1.0) * ATTENUATION;
+	DIFFUSE_LIGHT = ALBEDO * LIGHT_COLOR * ndotl;
+	// Grass has no meaningful specular (the article's final shader is diffuse-only).
+	SPECULAR_LIGHT = vec3(0.0);
 }

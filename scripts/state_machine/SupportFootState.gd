@@ -29,11 +29,14 @@ func enter(_controller: FreeKickController) -> void:
 func _process(delta: float) -> void:
 	elapsed += delta
 	var step_text := "1/2 LOCATION - release to lock" if substep == Substep.LOCATION else "2/2 FOOT ANGLE - release to continue"
-	controller.ui.set_status("PLANT %s - %.1fs" % [step_text, maxf(0.0, controller.difficulty.step2_time_limit - elapsed)])
+	var time_limit := controller.effective_step_time_limit(2)
+	var remaining := maxf(0.0, time_limit - elapsed)
+	controller.ui.set_phase_progress(remaining / maxf(0.001, time_limit), "%.1fs" % remaining)
+	controller.ui.set_status("PLANT %s - %.1fs" % [step_text, remaining])
 	_align_world_marker()
 	if touching:
 		touch_elapsed += delta
-	elif elapsed >= controller.difficulty.step2_time_limit:
+	elif elapsed >= time_limit:
 		_commit(true)
 
 func _input(event: InputEvent) -> void:
@@ -83,6 +86,9 @@ func _update_from_screen(pos: Vector2) -> void:
 		has_marker = true
 		foot_angle = marker_local.angle() if marker_local.length() > 0.001 else 0.0
 		controller.ui.update_support_marker(marker_local)
+		# Live feedback: the plant distance gates how wide the aim lane can open.
+		var support := FreeKickInputMapper.support_vector_from_marker(marker_local, radius)
+		controller.ui.update_support_angle_scale(ShotCalculator.support_angle_scale(support))
 	else:
 		# Substep 2 is a stable left/right aim slider, not a free rotation around the plant foot.
 		# This avoids twitchy angle jumps when the finger is close to the planted marker.

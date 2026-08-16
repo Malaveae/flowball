@@ -4,6 +4,7 @@ extends Node
 signal free_kick_started
 signal shot_calculated(shot_params: ShotParams)
 signal free_kick_finished(report: Resource)
+signal player_profile_changed(profile: FreeKickPlayerProfile)
 
 @export var ball_path: NodePath
 @export var kicker_path: NodePath
@@ -16,7 +17,11 @@ var shot_params: ShotParams
 var run_id: int = 0
 var free_kick_position: Vector3 = Vector3(0.0, 0.16, 0.0)
 var spot_label: String = "Center 24m"
+var active_profile_id: String = ""
+var active_profile: FreeKickPlayerProfile
 var _step2_end_msec: int = 0  # transient: timestamp when step 2 committed, used for step2→3 speed bonus
+var step2_time_limit_effective: float = -1.0  # set at PowerState release; power pressure scales the step 2 budget
+var step3_time_limit_effective: float = -1.0  # set at PowerState release; power pressure scales the step 3 budget
 
 @onready var state_machine: FreeKickStateMachine = $FreeKickStateMachine
 @onready var ui: FreeKickUI = $FreeKickUI
@@ -34,8 +39,25 @@ func _ready() -> void:
 	ui.restart_requested.connect(_on_restart_requested)
 	ui.switch_foot_requested.connect(_on_switch_foot_requested)
 	ui.next_spot_requested.connect(_on_next_spot_requested)
+	ui.prev_player_requested.connect(_on_prev_player_requested)
+	ui.next_player_requested.connect(_on_next_player_requested)
 	state_machine.state_changed.connect(_on_state_changed)
 	state_machine.setup(self)
+
+func set_player_profile(profile: FreeKickPlayerProfile) -> void:
+	if profile == null:
+		return
+	active_profile = profile
+	active_profile_id = profile.id
+	stats = profile.duplicate_stats()
+	if ui != null:
+		ui.set_player_profile_info(profile)
+	player_profile_changed.emit(profile)
+
+func preferred_kicking_foot() -> String:
+	if stats != null and (stats.preferred_foot == "left" or stats.preferred_foot == "right"):
+		return stats.preferred_foot
+	return "right"
 
 func set_free_kick_spot(label: String, ball_position: Vector3, goal_position: Vector3 = Vector3(0.0, 1.2, -52.5)) -> void:
 	spot_label = label
@@ -54,6 +76,8 @@ func set_free_kick_spot(label: String, ball_position: Vector3, goal_position: Ve
 
 func start_free_kick(selected_foot: String = "right") -> void:
 	run_id += 1
+	step2_time_limit_effective = -1.0
+	step3_time_limit_effective = -1.0
 	input_data = FreeKickInputData.new()
 	input_data.selected_foot = selected_foot
 	if ui != null:
@@ -69,6 +93,17 @@ func calculate_shot() -> ShotParams:
 	shot_params = ShotCalculator.calculate(input_data, stats, environment, difficulty)
 	shot_calculated.emit(shot_params)
 	return shot_params
+
+func set_power_time_budget(power: float) -> void:
+	# Harder shots give less time to plant and strike (risk/reward for over-power).
+	step2_time_limit_effective = difficulty.step_time_budget(power, 2)
+	step3_time_limit_effective = difficulty.step_time_budget(power, 3)
+
+func effective_step_time_limit(step: int) -> float:
+	match step:
+		2: return step2_time_limit_effective if step2_time_limit_effective > 0.0 else difficulty.step2_time_limit
+		3: return step3_time_limit_effective if step3_time_limit_effective > 0.0 else difficulty.step3_time_limit
+	return 0.0
 
 func get_ball() -> FreeKickBall3D:
 	return get_node_or_null(ball_path) as FreeKickBall3D
@@ -94,6 +129,16 @@ func _on_next_spot_requested() -> void:
 	var sandbox := get_parent()
 	if sandbox != null and sandbox.has_method("cycle_set_piece_spot"):
 		sandbox.call("cycle_set_piece_spot")
+
+func _on_prev_player_requested() -> void:
+	var sandbox := get_parent()
+	if sandbox != null and sandbox.has_method("cycle_player"):
+		sandbox.call("cycle_player", -1)
+
+func _on_next_player_requested() -> void:
+	var sandbox := get_parent()
+	if sandbox != null and sandbox.has_method("cycle_player"):
+		sandbox.call("cycle_player", 1)
 
 func _on_state_changed(state_name: StringName) -> void:
 	if ui != null:

@@ -5,6 +5,7 @@ var elapsed := 0.0
 var swipe_duration := 0.0
 var touching := false
 var ball_radius_px := 180.0
+var swipe_cap_px := 180.0
 var raw_points := PackedVector2Array()
 var _transition_recorded := false
 
@@ -15,6 +16,12 @@ func enter(_controller: FreeKickController) -> void:
 	touching = false
 	raw_points = PackedVector2Array()
 	_transition_recorded = false
+	# Power pressure: an over-powered strike leaves less room for follow-through,
+	# so the drag trace shrinks and favors a straight/puntera or knuckleball.
+	var curve_stat := 0.0
+	if controller.stats != null:
+		curve_stat = controller.stats.normalized(controller.stats.curve)
+	swipe_cap_px = ball_radius_px * ContactGesture.l_max(controller.input_data.power_normalized, curve_stat, controller.difficulty)
 	controller.camera_rig.set_mode(&"BALL_CONTACT_UI")
 	controller.ui.show_ball_contact_ui()
 	controller.ui.set_status("Step 3: point on ball, then drag follow-through")
@@ -22,10 +29,13 @@ func enter(_controller: FreeKickController) -> void:
 func _process(delta: float) -> void:
 	elapsed += delta
 	controller.ui.align_ball_contact_overlay(controller.get_ball(), controller.camera_rig.get_camera())
-	controller.ui.set_status("CONTACT - point and drag - %.1fs" % maxf(0.0, controller.difficulty.step3_time_limit - elapsed))
+	var time_limit := controller.effective_step_time_limit(3)
+	var remaining := maxf(0.0, time_limit - elapsed)
+	controller.ui.set_phase_progress(remaining / maxf(0.001, time_limit), "%.1fs" % remaining)
+	controller.ui.set_status("CONTACT - point and drag - %.1fs" % remaining)
 	if touching:
 		swipe_duration += delta
-	elif elapsed >= controller.difficulty.step3_time_limit:
+	elif elapsed >= time_limit:
 		_commit(true)
 
 func _input(event: InputEvent) -> void:
@@ -66,13 +76,13 @@ func _input(event: InputEvent) -> void:
 		if raw_points.is_empty():
 			local = local.limit_length(ball_radius_px)
 		else:
-			local = local.limit_length(ball_radius_px * 1.8)
+			local = local.limit_length(swipe_cap_px)
 		raw_points.append(local)
 		controller.ui.update_ball_contact(raw_points)
 		get_viewport().set_input_as_handled()
 	elif released:
 		touching = false
-		if raw_points.size() >= 2:
+		if raw_points.size() >= 1:
 			_commit(false)
 		get_viewport().set_input_as_handled()
 

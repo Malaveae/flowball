@@ -1,8 +1,8 @@
 [gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/sandbox/GrassPatch3D.gd" id="1"]
-[ext_resource type="Texture2D" uid="uid://ho8m4r5pm6pp" path="res://assets/textures/grass_blade_cluster_placeholder.png" id="2"]
-[ext_resource type="Texture2D" uid="uid://pyur64ndh4iq" path="res://assets/textures/grass_blade_cluster_normal_placeholder.png" id="3"]
+[ext_resource type="Texture2D" path="res://assets/textures/grass_blade_atlas.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/textures/grass_blade_atlas_normal.png" id="3"]
 [ext_resource type="Texture2D" uid="uid://tys6kbrr3isc" path="res://assets/textures/wind_noise.png" id="4"]
 [ext_resource type="Shader" path="res://assets/shaders/grass_card.gdshader" id="5"]
 

@@ -35,6 +35,8 @@ var current_spot_misses := 0
 var current_spot_goal_scored := false
 var game_over := false
 var completed_set_pieces: Array[Dictionary] = []
+var player_catalog: FreeKickPlayerCatalog = FreeKickPlayerCatalog.new()
+var player_index := 0
 
 func _ready() -> void:
 	wall_rng.randomize()
@@ -46,10 +48,34 @@ func _ready() -> void:
 		goal_trigger.goal_scored.connect(_on_goal_scored)
 	controller.free_kick_finished.connect(_on_free_kick_finished)
 	controller.shot_calculated.connect(_on_shot_calculated)
+	_load_player_catalog()
 	_generate_set_piece()
 	_apply_set_piece_spot()
 	# Start immediately for prototype. In production, match controller would call this.
-	_start_attempt("right")
+	_start_attempt(controller.preferred_kicking_foot())
+
+func _load_player_catalog() -> void:
+	if not player_catalog.load_from_json():
+		push_error("FreeKickSandbox: %s" % player_catalog.last_error)
+		return
+	var default_profile := player_catalog.default_profile()
+	if default_profile == null:
+		return
+	player_index = maxi(0, player_catalog.index_of(default_profile.id))
+	controller.set_player_profile(default_profile)
+
+func cycle_player(direction: int = 1) -> void:
+	if player_catalog.count() <= 0 or game_over:
+		return
+	player_index = wrapi(player_index + direction, 0, player_catalog.count())
+	var profile := player_catalog.get_at(player_index)
+	if profile == null:
+		return
+	controller.set_player_profile(profile)
+	# Keep the selected build across set pieces; restart the current attempt with preferred foot.
+	if current_spot_attempts > 0:
+		current_spot_attempts -= 1
+	_start_attempt(controller.preferred_kicking_foot())
 
 func cycle_set_piece_spot() -> void:
 	if game_over:
@@ -103,6 +129,8 @@ func _on_goal_scored() -> void:
 		"label": String(current_set_piece["label"]),
 		"attempts": current_spot_attempts,
 	})
+	if controller.ui != null:
+		controller.ui.show_result_banner("GOAL!", "SET PIECE #%02d COMPLETED IN %d ATTEMPT%s" % [set_piece_number, current_spot_attempts, "" if current_spot_attempts == 1 else "S"], Color(0.0, 0.95, 1.0))
 	_update_scoreboard("GOAL! %s completed in %d attempt%s. Next set piece..." % [String(current_set_piece["label"]), current_spot_attempts, "" if current_spot_attempts == 1 else "s"])
 	await get_tree().create_timer(1.25).timeout
 	if game_over:
@@ -133,7 +161,7 @@ func _game_over() -> void:
 	_update_scoreboard("GAME OVER - failed to score in %d trials." % MAX_TRIALS_PER_SET_PIECE)
 	if controller != null and controller.ui != null:
 		controller.ui.hide_all()
-		controller.ui.set_scoreboard(_scoreboard_text("GAME OVER - failed to score in %d trials. Press R to restart run." % MAX_TRIALS_PER_SET_PIECE))
+		controller.ui.show_game_over("GAME OVER - failed to score in %d trials. Press R to restart run." % MAX_TRIALS_PER_SET_PIECE)
 
 func _update_scoreboard(message: String = "") -> void:
 	if controller != null and controller.ui != null:
@@ -220,8 +248,22 @@ func _setup_ground_shader() -> void:
 	mat.set_shader_parameter("rough_tex",  load("res://assets/Cesped/grass_roughness_1024.png"))
 	mat.set_shader_parameter("uv_scale_x", 42.0)
 	mat.set_shader_parameter("uv_scale_y", 64.0)
-	mat.set_shader_parameter("patch_noise_scale", 3.5)
-	mat.set_shader_parameter("patch_noise_strength", 0.12)
+	# Keep patch noise aligned with the grass-card shader (same scale/strength).
+	mat.set_shader_parameter("patch_noise_scale", 8.0)
+	mat.set_shader_parameter("patch_noise_strength", 0.18)
+	# Mowing stripes: alternating bands along the pitch length (TV broadcast cue).
+	mat.set_shader_parameter("stripe_width", 7.5)
+	mat.set_shader_parameter("stripe_strength", 0.09)
+	mat.set_shader_parameter("stripe_edge", 0.12)
+	# Area wear: worn turf at the goalmouth, penalty spot, and shot spot.
+	mat.set_shader_parameter("wear_strength", 0.32)
+	mat.set_shader_parameter("wear_radius", 8.0)
+	mat.set_shader_parameter("wear_stretch", 1.7)
+	mat.set_shader_parameter("wear_noise_scale", 2.2)
+	mat.set_shader_parameter("wear_spot_goal", Vector3(0.0, 0.0, -49.5))
+	mat.set_shader_parameter("wear_spot_penalty", Vector3(0.0, 0.0, -41.5))
+	mat.set_shader_parameter("wear_spot_shot", Vector3(0.0, 0.0, 0.0))
+	mat.set_shader_parameter("wear_weights", Vector3(1.0, 0.9, 0.7))
 	pitch_mesh.material_override = mat
 	var goal_floor := get_node_or_null("GoalBackgroundFloor/Mesh") as MeshInstance3D
 	if goal_floor != null:

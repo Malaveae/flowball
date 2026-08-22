@@ -8,8 +8,12 @@ signal switch_foot_requested
 signal next_spot_requested
 signal prev_player_requested
 signal next_player_requested
+signal aim_toggle_pressed
 
 var ui_root: Control
+var aim_toggle_button: Button
+var _aim_toggle_enabled := false
+var _aim_toggle_angle_mode := false
 
 class ModernScoreHud:
 	extends Control
@@ -282,6 +286,7 @@ func _ready() -> void:
 		ui_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_update_uiroot_margins()
 		get_viewport().size_changed.connect(_update_uiroot_margins)
+	_create_aim_toggle()
 	left_support_boot_texture = LEFT_SUPPORT_BOOT_TEXTURE
 	support_zone_overlay = _create_support_zone_overlay()
 	support_marker_hint = _create_support_marker_hint()
@@ -320,6 +325,8 @@ func _update_uiroot_margins() -> void:
 
 ## Positions `control` inside ui_root at a normalized anchor point (0..1) with an edge margin.
 ## Sizes scale with the widget scale; margins stay in viewport px (stretch already scales them).
+## Positions `control` inside ui_root at a normalized anchor point (0..1) with an edge margin.
+## Sizes scale with the widget scale; margins stay in viewport px (stretch already scales them).
 func _place_anchored(control: Control, anchor_point: Vector2, margin: Vector2, size_value: Vector2) -> void:
 	if control == null or ui_root == null:
 		return
@@ -340,6 +347,36 @@ func _place_anchored(control: Control, anchor_point: Vector2, margin: Vector2, s
 	else:
 		control.offset_top = -margin.y - s.y
 		control.offset_bottom = -margin.y
+
+## Bottom-center AIM/PLANT toggle, reachable by the second thumb in landscape.
+func _create_aim_toggle() -> void:
+	aim_toggle_button = Button.new()
+	aim_toggle_button.name = "AimToggleButton"
+	aim_toggle_button.text = "AIM"
+	aim_toggle_button.disabled = true
+	aim_toggle_button.visible = false
+	aim_toggle_button.pressed.connect(func() -> void: aim_toggle_pressed.emit())
+	aim_toggle_button.add_theme_font_size_override("font_size", 16)
+	aim_toggle_button.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.85))
+	aim_toggle_button.add_theme_stylebox_override("normal", _make_panel_style(Color(0.0, 0.0, 0.0, 0.34), Color(1.0, 1.0, 1.0, 0.25), 1, 8))
+	aim_toggle_button.add_theme_stylebox_override("hover", _make_panel_style(Color(1.0, 1.0, 1.0, 0.12), Color(1.0, 1.0, 1.0, 0.5), 1, 8))
+	aim_toggle_button.add_theme_stylebox_override("pressed", _make_panel_style(Color(1.0, 1.0, 1.0, 0.18), Color(1.0, 0.86, 0.25, 0.72), 1, 8))
+	if ui_root != null:
+		ui_root.add_child(aim_toggle_button)
+	else:
+		add_child(aim_toggle_button)
+	_place_anchored(aim_toggle_button, Vector2(0.5, 1.0), Vector2(0.0, 24.0), Vector2(120.0, 52.0))
+
+func set_aim_toggle_enabled(enabled: bool) -> void:
+	_aim_toggle_enabled = enabled
+	if aim_toggle_button != null:
+		aim_toggle_button.visible = enabled
+		aim_toggle_button.disabled = not enabled
+
+func set_aim_toggle_mode(in_angle_mode: bool) -> void:
+	_aim_toggle_angle_mode = in_angle_mode
+	if aim_toggle_button != null:
+		aim_toggle_button.text = "PLANT" if in_angle_mode else "AIM"
 
 func hide_all() -> void:
 	power_label.visible = false
@@ -628,6 +665,7 @@ func show_power(power_value: float) -> void:
 
 func show_support_foot_sector(selected_foot: String, _difficulty: FreeKickDifficulty) -> void:
 	hide_all()
+	set_aim_toggle_enabled(false)
 	_set_active_step(2)
 	set_phase_progress(1.0, "")
 	var support_foot := _support_foot_for_kick(selected_foot)

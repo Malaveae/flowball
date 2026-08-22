@@ -41,8 +41,14 @@ func _ready() -> void:
 	ui.next_spot_requested.connect(_on_next_spot_requested)
 	ui.prev_player_requested.connect(_on_prev_player_requested)
 	ui.next_player_requested.connect(_on_next_player_requested)
+	ui.aim_toggle_pressed.connect(_on_aim_toggle_pressed)
 	state_machine.state_changed.connect(_on_state_changed)
 	state_machine.setup(self)
+
+## Routes the touch AIM/PLANT toggle to the support-foot state when active.
+func _on_aim_toggle_pressed() -> void:
+	if state_machine.current_state is SupportFootState:
+		(state_machine.current_state as SupportFootState).set_aim_toggle_requested()
 
 func set_player_profile(profile: FreeKickPlayerProfile) -> void:
 	if profile == null:

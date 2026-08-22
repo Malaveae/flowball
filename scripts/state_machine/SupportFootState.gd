@@ -3,6 +3,8 @@ extends FreeKickState
 
 enum Substep { LOCATION, ANGLE }
 
+signal plant_legality_changed(legal: bool)
+
 var elapsed := 0.0
 var touch_elapsed := 0.0
 var touching := false
@@ -12,6 +14,7 @@ var aim_target := 0.0
 var radius := 160.0
 var has_marker := false
 var substep: Substep = Substep.LOCATION
+var _drag_index := -1  # touch index of the primary dragging thumb
 
 func enter(_controller: FreeKickController) -> void:
 	super.enter(_controller)
@@ -22,9 +25,11 @@ func enter(_controller: FreeKickController) -> void:
 	substep = Substep.LOCATION
 	foot_angle = 0.0
 	aim_target = 0.0
+	_drag_index = -1
 	controller.camera_rig.set_mode(&"SUPPORT_TOP_DOWN")
 	controller.ui.show_support_foot_sector(controller.input_data.selected_foot, controller.difficulty)
 	controller.ui.update_support_marker(Vector2(-radius * 0.55 if controller.input_data.selected_foot == "right" else radius * 0.55, 0.0))
+	_update_plant_legality_ui()
 
 func _process(delta: float) -> void:
 	elapsed += delta
@@ -71,11 +76,16 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif released:
 		touching = false
-		if substep == Substep.LOCATION and has_marker:
-			substep = Substep.ANGLE
-			controller.ui.update_support_foot_angle(foot_angle, aim_target)
-		elif substep == Substep.ANGLE and has_marker:
-			_commit(false)
+		var action := SupportGestureRouter.resolve_release(substep, has_marker)
+		match action:
+			SupportGestureRouter.Action.ADVANCE_SUBSTEP:
+				substep = Substep.ANGLE
+				controller.ui.set_aim_toggle_mode(true)
+				controller.ui.update_support_foot_angle(foot_angle, aim_target)
+			SupportGestureRouter.Action.COMMIT:
+				_commit(false)
+			_:
+				pass
 		get_viewport().set_input_as_handled()
 
 func _update_from_screen(pos: Vector2) -> void:
@@ -86,6 +96,7 @@ func _update_from_screen(pos: Vector2) -> void:
 		has_marker = true
 		foot_angle = marker_local.angle() if marker_local.length() > 0.001 else 0.0
 		controller.ui.update_support_marker(marker_local)
+		_update_plant_legality_ui()
 		# Live feedback: the plant distance gates how wide the aim lane can open.
 		var support := FreeKickInputMapper.support_vector_from_marker(marker_local, radius)
 		controller.ui.update_support_angle_scale(ShotCalculator.support_angle_scale(support))
@@ -125,6 +136,36 @@ func _screen_to_ball_local(screen_pos: Vector2) -> Vector2:
 	var pixels := screen_pos - center
 	var meters := pixels / px_per_meter
 	return meters * radius
+
+## Toggle entry point called by the UI's AIM/PLANT button (second thumb on touch).
+func set_aim_toggle_requested() -> void:
+	var legal := _is_plant_legal()
+	var action := SupportGestureRouter.resolve_touch_press(substep, has_marker, true, legal)
+	match action:
+		SupportGestureRouter.Action.TOGGLE_TO_ANGLE:
+			substep = Substep.ANGLE
+			controller.ui.set_aim_toggle_mode(true)
+			controller.ui.update_support_foot_angle(foot_angle, aim_target)
+		SupportGestureRouter.Action.TOGGLE_TO_LOCATION:
+			substep = Substep.LOCATION
+			controller.ui.set_aim_toggle_mode(false)
+		_:
+			pass
+
+## Single source of truth for plant legality: marker must sit on the physical
+## support-foot side (right kick -> support foot plants left of the ball).
+func _is_plant_legal() -> bool:
+	if not has_marker:
+		return false
+	var support := FreeKickInputMapper.support_vector_from_marker(marker_local, radius)
+	if controller.input_data.selected_foot == "right":
+		return support.x < -0.05
+	return support.x > 0.05
+
+func _update_plant_legality_ui() -> void:
+	var legal := _is_plant_legal()
+	plant_legality_changed.emit(legal)
+	controller.ui.set_aim_toggle_enabled(legal)
 
 func _commit(use_default: bool) -> void:
 	if use_default or not has_marker:

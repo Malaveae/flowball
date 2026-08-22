@@ -25,12 +25,46 @@ signal mode_changed(mode: StringName)
 var mode: StringName = &"MATCH_VIEW"
 var _tween: Tween
 
+const SHOT_FOLLOW_RATE := 6.0  # 1/s lerp rate toward target transform
+var _follow_active := false
+
+func tracking_active() -> bool:
+	return _follow_active
+
 func set_mode(next_mode: StringName) -> void:
 	mode = next_mode
+	_follow_active = next_mode == &"SHOT_FOLLOW"
+	process_mode = Node.PROCESS_MODE_ALWAYS if _follow_active else Node.PROCESS_MODE_INHERIT
 	var camera := get_camera()
 	if camera != null:
 		_apply_camera_transform(camera, _transform_for_mode(next_mode), _fov_for_mode(next_mode))
 	mode_changed.emit(mode)
+
+func _process(delta: float) -> void:
+	if not _follow_active or mode != &"SHOT_FOLLOW":
+		return
+	var camera := get_camera()
+	if camera == null:
+		return
+	var target := _shot_follow_transform()
+	var weight := 1.0 - exp(-SHOT_FOLLOW_RATE * delta)
+	camera.global_transform = camera.global_transform.interpolate_with(target, weight)
+	camera.fov = lerpf(camera.fov, shot_follow_fov, weight)
+
+## Live shot-follow target computed from the ball's CURRENT position, not the launch-time snapshot.
+func _shot_follow_transform() -> Transform3D:
+	var ball := _target_position()
+	var goal := goal_position
+	var to_goal := (goal - ball).slide(Vector3.UP)
+	if to_goal.length() < 0.01:
+		to_goal = Vector3.FORWARD
+	var dir := to_goal.normalized()
+	var distance := ball.distance_to(goal)
+	var behind := clampf(distance * 0.16, 3.2, 6.0)
+	var origin := ball - dir * behind + Vector3.UP * 1.85
+	origin = _clamp_camera_origin(origin)
+	var target_point := goal.lerp(ball, 0.30) + Vector3.UP * 0.7
+	return Transform3D(Basis.looking_at((target_point - origin).normalized(), Vector3.UP), origin)
 
 func get_camera() -> Camera3D:
 	return get_node_or_null(camera_path) as Camera3D

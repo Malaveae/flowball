@@ -134,6 +134,7 @@ func _show_outcome_banner(outcome: StringName) -> void:
 	# Goals use their own banner from the sandbox goal trigger.
 	if controller.ui == null:
 		return
+	_show_impact_for_outcome(outcome)
 	match outcome:
 		&"background_contact":
 			controller.ui.show_result_banner("MISSED", "Wide of the goal - keep aim inside the posts", Color(1.0, 0.30, 0.22))
@@ -143,3 +144,21 @@ func _show_outcome_banner(outcome: StringName) -> void:
 			controller.ui.show_result_banner("IT HIT THE POST", "So close - aim a touch inside", Color(0.0, 0.85, 1.0))
 		&"crossbar":
 			controller.ui.show_result_banner("CROSSBAR", "So close - a little more dip", Color(0.92, 0.96, 1.0))
+
+## Ring pulse at the ball's current position for non-goal outcomes (goals pulse from the sandbox).
+func _show_impact_for_outcome(outcome: StringName) -> void:
+	if controller.ui == null or _launched_ball == null:
+		return
+	var camera := controller.camera_rig.get_camera()
+	if camera == null:
+		return
+	var pos := _launched_ball.global_position
+	match outcome:
+		&"keeper_contact":
+			controller.ui.show_impact_pulse(pos, camera, "SAVED", Color(1.0, 0.68, 0.22))
+		&"post":
+			controller.ui.show_impact_pulse(pos, camera, "POST", Color(0.0, 0.85, 1.0))
+		&"crossbar":
+			controller.ui.show_impact_pulse(pos, camera, "CROSSBAR", Color(0.92, 0.96, 1.0))
+		&"background_contact":
+			controller.ui.show_impact_pulse(pos, camera, "WIDE", Color(1.0, 0.30, 0.22))

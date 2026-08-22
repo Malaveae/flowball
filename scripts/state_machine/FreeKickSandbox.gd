@@ -131,6 +131,8 @@ func _on_goal_scored() -> void:
 	})
 	if controller.ui != null:
 		controller.ui.show_result_banner("GOAL!", "SET PIECE #%02d COMPLETED IN %d ATTEMPT%s" % [set_piece_number, current_spot_attempts, "" if current_spot_attempts == 1 else "S"], Color(0.0, 0.95, 1.0))
+		var camera := controller.camera_rig.get_camera()
+		controller.ui.show_impact_pulse(GOAL_CENTER, camera, "GOAL!", Color(0.0, 0.95, 1.0))
 	_update_scoreboard("GOAL! %s completed in %d attempt%s. Next set piece..." % [String(current_set_piece["label"]), current_spot_attempts, "" if current_spot_attempts == 1 else "s"])
 	await get_tree().create_timer(1.25).timeout
 	if game_over:

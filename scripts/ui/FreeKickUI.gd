@@ -15,6 +15,14 @@ var aim_toggle_button: Button
 var _aim_toggle_enabled := false
 var _aim_toggle_angle_mode := false
 
+var impact_pulse: Control
+var impact_pulse_progress := 0.0
+var impact_pulse_alpha := 1.0
+var impact_pulse_label := ""
+var impact_pulse_color := Color.WHITE
+var impact_pulse_screen_pos := Vector2.ZERO
+var impact_pulse_tween: Tween
+
 class ModernScoreHud:
 	extends Control
 
@@ -287,6 +295,7 @@ func _ready() -> void:
 		_update_uiroot_margins()
 		get_viewport().size_changed.connect(_update_uiroot_margins)
 	_create_aim_toggle()
+	impact_pulse = _create_impact_pulse()
 	left_support_boot_texture = LEFT_SUPPORT_BOOT_TEXTURE
 	support_zone_overlay = _create_support_zone_overlay()
 	support_marker_hint = _create_support_marker_hint()
@@ -377,6 +386,60 @@ func set_aim_toggle_mode(in_angle_mode: bool) -> void:
 	_aim_toggle_angle_mode = in_angle_mode
 	if aim_toggle_button != null:
 		aim_toggle_button.text = "PLANT" if in_angle_mode else "AIM"
+
+func _create_impact_pulse() -> Control:
+	var pulse := Control.new()
+	pulse.name = "ImpactPulse"
+	pulse.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pulse.visible = false
+	pulse.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pulse.draw.connect(_draw_impact_pulse)
+	if ui_root != null:
+		ui_root.add_child(pulse)
+	else:
+		add_child(pulse)
+	return pulse
+
+## Ring pulse + label anchored to a world-space impact point (deterministic tween, no RNG).
+func show_impact_pulse(world_point: Vector3, camera: Camera3D, label: String, color: Color) -> void:
+	if impact_pulse == null or camera == null:
+		return
+	impact_pulse_screen_pos = camera.unproject_position(world_point)
+	impact_pulse_label = label
+	impact_pulse_color = color
+	impact_pulse_progress = 0.0
+	impact_pulse_alpha = 1.0
+	impact_pulse.visible = true
+	impact_pulse.queue_redraw()
+	if impact_pulse_tween != null and impact_pulse_tween.is_valid():
+		impact_pulse_tween.kill()
+	impact_pulse_tween = create_tween()
+	impact_pulse_tween.tween_method(_set_impact_progress, 0.0, 1.0, 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	impact_pulse_tween.tween_method(_set_impact_alpha, 1.0, 0.0, 0.4)
+	impact_pulse_tween.tween_callback(func() -> void:
+		impact_pulse.visible = false
+	)
+
+func _set_impact_progress(value: float) -> void:
+	impact_pulse_progress = value
+	if impact_pulse != null:
+		impact_pulse.queue_redraw()
+
+func _set_impact_alpha(value: float) -> void:
+	impact_pulse_alpha = value
+	if impact_pulse != null:
+		impact_pulse.queue_redraw()
+
+func _draw_impact_pulse() -> void:
+	if impact_pulse == null or not impact_pulse.visible:
+		return
+	var center := impact_pulse_screen_pos
+	var radius := 14.0 + impact_pulse_progress * 90.0
+	var a := impact_pulse_alpha
+	impact_pulse.draw_arc(center, radius, 0.0, TAU, 48, Color(impact_pulse_color, 0.85 * a), 3.0)
+	impact_pulse.draw_arc(center, radius * 0.55, 0.0, TAU, 48, Color(impact_pulse_color, 0.35 * a), 2.0)
+	var font := impact_pulse.get_theme_default_font()
+	impact_pulse.draw_string(font, Vector2(center.x - 60.0, center.y + radius + 22.0), impact_pulse_label, HORIZONTAL_ALIGNMENT_CENTER, 120.0, 13, Color(1.0, 1.0, 1.0, 0.95 * a))
 
 func hide_all() -> void:
 	power_label.visible = false

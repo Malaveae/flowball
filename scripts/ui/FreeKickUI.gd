@@ -184,8 +184,9 @@ class ModernScoreHud:
 		draw_style_box(fill, fill_rect)
 
 	func _draw_phase_bar(font: Font) -> void:
-		var bar_pos := Vector2(230.0, 150.0)
 		var bar_size := Vector2(480.0, 18.0)
+		# Horizontally centered within the HUD's own width.
+		var bar_pos := Vector2((size.x - bar_size.x) * 0.5, 150.0)
 		var gap := 4.0
 		var seg_w := (bar_size.x - gap * 2.0) / 3.0
 		var bar_rect := Rect2(bar_pos, bar_size)
@@ -757,17 +758,24 @@ func _create_score_hud() -> Control:
 		add_child(hud)
 	return hud
 
+const SCORE_HUD_DESIGN_SIZE := Vector2(980.0, 180.0)
+
 func _center_score_hud() -> void:
 	if score_hud == null or ui_root == null:
 		return
+	# Anchor+offset sizing mutates `size`; always recompute from the design size
+	# so repeated resizes cannot compound-shrink the HUD.
+	score_hud.size = SCORE_HUD_DESIGN_SIZE
+	score_hud.pivot_offset = SCORE_HUD_DESIGN_SIZE * 0.5
 	score_hud.anchor_left = 0.5
 	score_hud.anchor_right = 0.5
 	score_hud.anchor_top = 0.0
 	score_hud.anchor_bottom = 0.0
-	score_hud.offset_left = -score_hud.size.x * score_hud.scale.x * 0.5
-	score_hud.offset_right = score_hud.size.x * score_hud.scale.x * 0.5
+	var half_w := SCORE_HUD_DESIGN_SIZE.x * score_hud.scale.x * 0.5
+	score_hud.offset_left = -half_w
+	score_hud.offset_right = half_w
 	score_hud.offset_top = 20.0
-	score_hud.offset_bottom = 20.0 + score_hud.size.y * score_hud.scale.y
+	score_hud.offset_bottom = 20.0 + SCORE_HUD_DESIGN_SIZE.y * score_hud.scale.y
 
 func set_kicking_foot(foot: String) -> void:
 	kicking_foot = foot

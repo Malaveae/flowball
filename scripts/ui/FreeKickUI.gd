@@ -721,6 +721,7 @@ func _create_score_hud() -> Control:
 	return hud
 
 const SCORE_HUD_DESIGN_SIZE := Vector2(980.0, 180.0)
+const SCORE_HUD_BOTTOM_BAND := 215.0  # design px reserved for the score HUD at the top
 
 func _center_score_hud() -> void:
 	if score_hud == null or ui_root == null:
@@ -999,9 +1000,13 @@ func align_power_meter_to_ball(ball: Node3D, camera: Camera3D) -> void:
 	if ball == null or camera == null or power_meter == null:
 		_position_power_meter_for_foot()
 		return
+	# Follow the ball horizontally only; vertical placement stays centered but
+	# always below the score HUD band (on phones the ball can project high).
 	var ball_screen := camera.unproject_position(ball.global_position)
 	var side := 1.0 if kicking_foot == "right" else -1.0
-	var desired := ball_screen + Vector2(side * 145.0, -170.0)
+	var viewport_height := get_viewport().get_visible_rect().size.y
+	var desired := Vector2(ball_screen.x + side * 145.0 - power_meter.size.x * 0.5, (viewport_height - power_meter.size.y) * 0.5)
+	desired.y = maxf(desired.y, SCORE_HUD_BOTTOM_BAND)
 	power_meter.position = _clamp_to_uiroot(desired, power_meter.size)
 	if power_label != null:
 		power_label.position = power_meter.position + Vector2(0.0, -46.0)
@@ -1017,16 +1022,20 @@ func _position_power_meter_for_foot() -> void:
 	var center_x := viewport_size.x * 0.5
 	var side := 1.0 if kicking_foot == "right" else -1.0
 	var desired := Vector2(center_x + side * 145.0 - power_meter.size.x * 0.5, (viewport_size.y - power_meter.size.y) * 0.5)
+	desired.y = maxf(desired.y, SCORE_HUD_BOTTOM_BAND)
 	power_meter.position = _clamp_to_uiroot(desired, power_meter.size)
 	if power_label != null:
 		power_label.position = power_meter.position + Vector2(0.0, -46.0)
 
 ## Keeps the power meter inside the safe-area UIRoot on small phone viewports.
+## The below-HUD band wins over the bottom margin when the viewport is too short.
 func _clamp_to_uiroot(desired_pos: Vector2, control_size: Vector2) -> Vector2:
 	if ui_root == null:
 		return desired_pos
 	var x := clampf(desired_pos.x, ui_root.offset_left + 18.0, ui_root.size.x + ui_root.offset_left - control_size.x - 18.0)
-	var y := clampf(desired_pos.y, ui_root.offset_top + 80.0, ui_root.size.y + ui_root.offset_top - control_size.y - 72.0)
+	var y_min := ui_root.offset_top + SCORE_HUD_BOTTOM_BAND
+	var y_max := ui_root.size.y + ui_root.offset_top - control_size.y - 72.0
+	var y := clampf(desired_pos.y, y_min, maxf(y_min, y_max))
 	return Vector2(x, y)
 
 func _style_button(button: Button, text_value: String) -> void:

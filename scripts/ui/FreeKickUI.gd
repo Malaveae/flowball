@@ -23,6 +23,14 @@ var impact_pulse_color := Color.WHITE
 var impact_pulse_screen_pos := Vector2.ZERO
 var impact_pulse_tween: Tween
 
+var result_card: Control
+var result_card_title := ""
+var result_card_cause := ""
+var result_card_data := ""
+var result_card_color := Color.WHITE
+var result_card_alpha := 1.0
+var result_card_progress := 0.0
+
 class ModernScoreHud:
 	extends Control
 
@@ -296,6 +304,7 @@ func _ready() -> void:
 		get_viewport().size_changed.connect(_update_uiroot_margins)
 	_create_aim_toggle()
 	impact_pulse = _create_impact_pulse()
+	result_card = _create_result_card()
 	left_support_boot_texture = LEFT_SUPPORT_BOOT_TEXTURE
 	support_zone_overlay = _create_support_zone_overlay()
 	support_marker_hint = _create_support_marker_hint()
@@ -331,6 +340,13 @@ func _update_uiroot_margins() -> void:
 	if score_hud != null:
 		score_hud.scale = Vector2.ONE * FreeKickUIScale.widget_scale(viewport_size.y)
 		_center_score_hud()
+	if result_card != null:
+		var s := FreeKickUIScale.widget_scale(viewport_size.y)
+		result_card.offset_left = -210.0 * s
+		result_card.offset_right = 210.0 * s
+		result_card.offset_top = 190.0 * s
+		result_card.offset_bottom = (190.0 + 130.0) * s
+		result_card.size = Vector2(420.0 * s, 130.0 * s)
 
 ## Positions `control` inside ui_root at a normalized anchor point (0..1) with an edge margin.
 ## Sizes scale with the widget scale; margins stay in viewport px (stretch already scales them).
@@ -610,26 +626,31 @@ func _create_wind_module() -> Control:
 		add_child(hud)
 	return hud
 
+## Compact result card (top-center under the score HUD): outcome / cause / data tiers.
+func _create_result_card() -> Control:
+	var card := Control.new()
+	card.name = "ResultCard"
+	card.visible = false
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.draw.connect(_draw_result_card)
+	card.anchor_left = 0.5
+	card.anchor_top = 0.0
+	card.anchor_right = 0.5
+	card.anchor_bottom = 0.0
+	var s := FreeKickUIScale.widget_scale(get_viewport().get_visible_rect().size.y if get_viewport().get_visible_rect().size.y > 0.0 else 720.0)
+	card.offset_left = -210.0 * s
+	card.offset_right = 210.0 * s
+	card.offset_top = 190.0 * s  # below the score HUD
+	card.offset_bottom = (190.0 + 130.0) * s
+	if ui_root != null:
+		ui_root.add_child(card)
+	else:
+		add_child(card)
+	return card
+
 ## Pops a result banner (goal, miss, save, post, crossbar). Deterministic tween, no RNG.
 func show_result_banner(text: String = "GOAL!", subtitle: String = "", highlight: Color = Color(0.0, 0.95, 1.0)) -> void:
-	if goal_banner == null:
-		return
-	goal_banner_text = text
-	goal_banner_subtitle = subtitle
-	goal_banner_color = highlight
-	goal_banner_progress = 0.0
-	goal_banner_alpha = 1.0
-	goal_banner.visible = true
-	goal_banner.queue_redraw()
-	if goal_banner_tween != null and goal_banner_tween.is_valid():
-		goal_banner_tween.kill()
-	goal_banner_tween = create_tween()
-	goal_banner_tween.tween_method(_set_goal_banner_progress, 0.0, 1.0, 0.42).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	goal_banner_tween.tween_interval(1.05)
-	goal_banner_tween.tween_method(_set_goal_banner_alpha, 1.0, 0.0, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	goal_banner_tween.tween_callback(func() -> void:
-		goal_banner.visible = false
-	)
+	_show_result_card(text, subtitle, "", highlight)
 
 func _set_goal_banner_progress(value: float) -> void:
 	goal_banner_progress = value
@@ -642,36 +663,86 @@ func _set_goal_banner_alpha(value: float) -> void:
 		goal_banner.queue_redraw()
 
 func _draw_goal_banner() -> void:
-	var banner := goal_banner
-	if banner == null or not banner.visible:
+	# The celebration banner was replaced by the compact result card (_draw_result_card).
+	pass
+
+func show_feedback(report: Resource, auto_restart_delay_seconds: float = 4.0) -> void:
+	hide_all()
+	_set_active_step(4)
+	set_phase_progress(1.0, "")
+	var cause := _result_cause_from_report(report)
+	var data := _result_data_from_report(report)
+	_show_result_card(report_summary(report), cause, data, Color(0.0, 0.95, 1.0))
+	instruction_label.visible = true
+	instruction_label.text = "Auto restart in %.0fs" % auto_restart_delay_seconds
+	set_status("Auto restart")
+
+func report_summary(report: Resource) -> String:
+	if report == null or report.get("summary") == null:
+		return "SHOT COMPLETE"
+	return String(report.get("summary")).to_upper()
+
+func _result_cause_from_report(report: Resource) -> String:
+	if report == null:
+		return ""
+	var lines: Array[String] = []
+	if report.get("support_feedback") != null and String(report.get("support_feedback")) != "":
+		lines.append(String(report.get("support_feedback")))
+	var curl_strength := String(report.get("curl_strength"))
+	if curl_strength == "low":
+		lines.append("add side contact for curl")
+	elif curl_strength != "":
+		lines.append("curl: %s" % curl_strength)
+	if report.get("coach_tip") != null and String(report.get("coach_tip")) != "":
+		lines.append(String(report.get("coach_tip")))
+	return " · ".join(lines)
+
+func _result_data_from_report(report: Resource) -> String:
+	if report == null:
+		return ""
+	var power := roundi(float(report.get("power")) * 100.0)
+	var elevation := roundi(float(report.get("elevation_angle")))
+	var curl := String(report.get("curl_strength"))
+	return "PWR %d%%  ·  ELEV %d°  ·  CURL %s" % [power, elevation, curl]
+
+func _show_result_card(title: String, cause: String, data: String, color: Color) -> void:
+	if result_card == null:
 		return
-	var center := banner.size * Vector2(0.5, 0.34)
-	var pop := clampf(goal_banner_progress, 0.0, 1.4)
-	var alpha := clampf(goal_banner_alpha, 0.0, 1.0)
-	# Expanding celebration rings, deterministic from the pop progress.
-	for i in 2:
-		var ring_radius := 46.0 + pop * (150.0 + float(i) * 52.0)
-		var ring_alpha := maxf(0.0, (1.0 - pop) * 0.5) * alpha
-		if ring_alpha > 0.01:
-			banner.draw_arc(center, ring_radius, 0.0, TAU, 48, Color(goal_banner_color, ring_alpha), 2.5)
-	var scale_factor := 0.42 + 0.58 * pop
-	var panel_size := Vector2(430.0, 134.0) * scale_factor
-	var panel_rect := Rect2(center - panel_size * 0.5, panel_size)
+	result_card_title = title
+	result_card_cause = cause
+	result_card_data = data
+	result_card_color = color
+	result_card_progress = 0.0
+	result_card_alpha = 1.0
+	result_card.visible = true
+	result_card.queue_redraw()
+	if goal_banner_tween != null and goal_banner_tween.is_valid():
+		goal_banner_tween.kill()
+	goal_banner_tween = create_tween()
+	goal_banner_tween.tween_method(_set_goal_banner_progress, 0.0, 1.0, 0.42).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	goal_banner_tween.tween_interval(1.05)
+	goal_banner_tween.tween_method(_set_goal_banner_alpha, 1.0, 0.0, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	goal_banner_tween.tween_callback(func() -> void:
+		result_card.visible = false
+	)
+
+func _draw_result_card() -> void:
+	if result_card == null or not result_card.visible:
+		return
+	var scale := FreeKickUIScale.widget_scale(get_viewport().get_visible_rect().size.y)
+	var font := result_card.get_theme_default_font()
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.0, 0.01, 0.03, 0.34 * alpha)
-	style.border_color = Color(goal_banner_color, 0.55 * alpha)
+	style.bg_color = Color(0.0, 0.01, 0.03, 0.72 * result_card_alpha)
+	style.border_color = Color(result_card_color, 0.55 * result_card_alpha)
 	style.set_border_width_all(2)
 	style.set_corner_radius_all(12)
-	banner.draw_style_box(style, panel_rect)
-	var font := banner.get_theme_default_font()
-	var title_size := roundi(74.0 * scale_factor)
-	var title_y := panel_rect.position.y + panel_rect.size.y * 0.46
-	banner.draw_string(font, Vector2(0.0, title_y), goal_banner_text, HORIZONTAL_ALIGNMENT_CENTER, banner.size.x, title_size, Color(goal_banner_color.darkened(0.45), 0.5 * alpha))
-	banner.draw_string(font, Vector2(0.0, title_y - 2.0), goal_banner_text, HORIZONTAL_ALIGNMENT_CENTER, banner.size.x, title_size, Color(goal_banner_color, alpha))
-	var accent_y := panel_rect.position.y + panel_rect.size.y * 0.64
-	banner.draw_rect(Rect2(Vector2(panel_rect.position.x + 48.0 * scale_factor, accent_y), Vector2(panel_rect.size.x - 96.0 * scale_factor, 2.0)), Color(goal_banner_color, 0.85 * alpha), true)
-	if goal_banner_subtitle != "":
-		banner.draw_string(font, Vector2(0.0, panel_rect.end.y - 18.0 * scale_factor), goal_banner_subtitle, HORIZONTAL_ALIGNMENT_CENTER, banner.size.x, roundi(16.0 * scale_factor), Color(1.0, 1.0, 1.0, 0.92 * alpha))
+	result_card.draw_style_box(style, Rect2(Vector2.ZERO, result_card.size))
+	var title_size := roundi(34.0 * scale)
+	result_card.draw_string(font, Vector2(0.0, 46.0 * scale), result_card_title, HORIZONTAL_ALIGNMENT_CENTER, result_card.size.x, title_size, Color(result_card_color, result_card_alpha))
+	if result_card_cause != "":
+		result_card.draw_string(font, Vector2(0.0, 78.0 * scale), result_card_cause, HORIZONTAL_ALIGNMENT_CENTER, result_card.size.x, roundi(14.0 * scale), Color(1.0, 1.0, 1.0, 0.92 * result_card_alpha))
+	if result_card_data != "":
+		result_card.draw_string(font, Vector2(0.0, 104.0 * scale), result_card_data, HORIZONTAL_ALIGNMENT_CENTER, result_card.size.x, roundi(11.0 * scale), Color(1.0, 1.0, 1.0, 0.5 * result_card_alpha))
 
 func _create_score_hud() -> Control:
 	var root := get_node_or_null("Root") as Control
@@ -866,23 +937,6 @@ func align_ball_contact_overlay(ball: Node3D, camera: Camera3D, world_radius: fl
 	ball_panel.position = center - ball_panel.size * 0.5
 	ball_panel.ball_radius_px = screen_radius
 	ball_panel.queue_redraw()
-
-func show_feedback(report: Resource, auto_restart_delay_seconds: float = 4.0) -> void:
-	hide_all()
-	_set_active_step(4)
-	set_phase_progress(1.0, "")
-	feedback_label.visible = true
-	feedback_label.position = Vector2(24.0, 370.0)
-	feedback_label.size = Vector2(760.0, 210.0)
-	feedback_label.add_theme_font_size_override("font_size", 15)
-	feedback_label.add_theme_stylebox_override("normal", _make_panel_style(Color(0.0, 0.0, 0.0, 0.34), Color(1.0, 1.0, 1.0, 0.14), 1, 6))
-	instruction_label.visible = true
-	instruction_label.text = "Auto restart in %.0fs" % auto_restart_delay_seconds
-	if report != null and report.get("summary") != null:
-		feedback_label.text = _format_feedback_report(report)
-	else:
-		feedback_label.text = "Shot complete"
-	set_status("Auto restart")
 
 func _format_feedback_report(report: Resource) -> String:
 	var lines: Array[String] = []

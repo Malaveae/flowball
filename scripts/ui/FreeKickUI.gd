@@ -739,17 +739,14 @@ func update_ball_contact(points: PackedVector2Array) -> void:
 
 func _ball_contact_feedback(points: PackedVector2Array) -> String:
 	if points.is_empty():
-		return "Ball contact: point and drag"
+		return "Touch the ball, then drag to follow through"
 	var contact := points[0] / maxf(1.0, ball_panel.ball_radius_px)
-	var height := "lift" if contact.y > 0.25 else "drive" if contact.y < -0.25 else "medium height"
+	var height := "lift" if contact.y > 0.25 else "drive" if contact.y < -0.25 else "medium"
 	if points.size() < 2:
-		return "Contact: %s - now drag follow-through" % height
+		return "Height: %s - keep dragging" % height
 	var follow := (points[points.size() - 1] - points[0]) / maxf(1.0, ball_panel.ball_radius_px)
-	var curl_strength := absf(follow.x) + absf(contact.x) * 0.75
-	var curl_side := "left" if follow.x < -0.12 else "right" if follow.x > 0.12 else "straight"
-	var curl_label := "LOW" if curl_strength < 0.35 else "MEDIUM" if curl_strength < 0.85 else "HIGH"
-	var length_label := "short" if follow.length() < 0.45 else "good" if follow.length() < 1.0 else "big"
-	return "Contact: %s - curl: %s %s - follow-through: %s" % [height, curl_label, curl_side, length_label]
+	var curl := "left" if follow.x < -0.12 else "right" if follow.x > 0.12 else "straight"
+	return "Height: %s - curl: %s" % [height, curl]
 
 func _ball_contact_status(points: PackedVector2Array) -> String:
 	if points.size() < 2:
@@ -798,6 +795,9 @@ func align_ball_contact_overlay(ball: Node3D, camera: Camera3D, world_radius: fl
 	var camera_right := camera.global_transform.basis.x.normalized()
 	var edge := camera.unproject_position(ball.global_position + camera_right * world_radius)
 	var screen_radius := maxf(80.0, absf(edge.x - center.x) * 1.35)
+	# Minimum effective contact diameter: the swipe target must stay accurate on small screens.
+	var min_radius := 70.0 * FreeKickUIScale.widget_scale(get_viewport().get_visible_rect().size.y)
+	screen_radius = maxf(min_radius, screen_radius)
 	var diameter := screen_radius * 2.0
 	ball_panel.size = Vector2(diameter, diameter)
 	ball_panel.position = center - ball_panel.size * 0.5

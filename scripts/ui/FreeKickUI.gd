@@ -892,12 +892,9 @@ func align_power_meter_to_ball(ball: Node3D, camera: Camera3D) -> void:
 	var ball_screen := camera.unproject_position(ball.global_position)
 	var side := 1.0 if kicking_foot == "right" else -1.0
 	var desired := ball_screen + Vector2(side * 145.0, -170.0)
-	var viewport_size := get_viewport().get_visible_rect().size
-	var x := clampf(desired.x - power_meter.size.x * 0.5, 18.0, viewport_size.x - power_meter.size.x - 18.0)
-	var y := clampf(desired.y, 80.0, viewport_size.y - power_meter.size.y - 72.0)
-	power_meter.position = Vector2(x, y)
+	power_meter.position = _clamp_to_uiroot(desired, power_meter.size)
 	if power_label != null:
-		power_label.position = Vector2(x, y - 46.0)
+		power_label.position = power_meter.position + Vector2(0.0, -46.0)
 
 func _position_power_meter_for_foot() -> void:
 	if power_meter == null:
@@ -907,10 +904,18 @@ func _position_power_meter_for_foot() -> void:
 		viewport_width = 1280.0
 	var center_x := viewport_width * 0.5
 	var side := 1.0 if kicking_foot == "right" else -1.0
-	var x := clampf(center_x + side * 145.0 - power_meter.size.x * 0.5, 18.0, viewport_width - power_meter.size.x - 18.0)
-	power_meter.position = Vector2(x, 250.0)
+	var desired := Vector2(center_x + side * 145.0 - power_meter.size.x * 0.5, 250.0)
+	power_meter.position = _clamp_to_uiroot(desired, power_meter.size)
 	if power_label != null:
-		power_label.position = Vector2(x, 204.0)
+		power_label.position = power_meter.position + Vector2(0.0, -46.0)
+
+## Keeps the power meter inside the safe-area UIRoot on small phone viewports.
+func _clamp_to_uiroot(desired_pos: Vector2, control_size: Vector2) -> Vector2:
+	if ui_root == null:
+		return desired_pos
+	var x := clampf(desired_pos.x, ui_root.offset_left + 18.0, ui_root.size.x + ui_root.offset_left - control_size.x - 18.0)
+	var y := clampf(desired_pos.y, ui_root.offset_top + 80.0, ui_root.size.y + ui_root.offset_top - control_size.y - 72.0)
+	return Vector2(x, y)
 
 func _style_button(button: Button, text_value: String) -> void:
 	button.text = text_value

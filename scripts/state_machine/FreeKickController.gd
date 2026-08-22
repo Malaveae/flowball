@@ -39,8 +39,6 @@ func _ready() -> void:
 	ui.restart_requested.connect(_on_restart_requested)
 	ui.switch_foot_requested.connect(_on_switch_foot_requested)
 	ui.next_spot_requested.connect(_on_next_spot_requested)
-	ui.prev_player_requested.connect(_on_prev_player_requested)
-	ui.next_player_requested.connect(_on_next_player_requested)
 	ui.aim_toggle_pressed.connect(_on_aim_toggle_pressed)
 	state_machine.state_changed.connect(_on_state_changed)
 	state_machine.setup(self)
@@ -56,8 +54,6 @@ func set_player_profile(profile: FreeKickPlayerProfile) -> void:
 	active_profile = profile
 	active_profile_id = profile.id
 	stats = profile.duplicate_stats()
-	if ui != null:
-		ui.set_player_profile_info(profile)
 	player_profile_changed.emit(profile)
 
 func preferred_kicking_foot() -> String:
@@ -135,16 +131,6 @@ func _on_next_spot_requested() -> void:
 	var sandbox := get_parent()
 	if sandbox != null and sandbox.has_method("cycle_set_piece_spot"):
 		sandbox.call("cycle_set_piece_spot")
-
-func _on_prev_player_requested() -> void:
-	var sandbox := get_parent()
-	if sandbox != null and sandbox.has_method("cycle_player"):
-		sandbox.call("cycle_player", -1)
-
-func _on_next_player_requested() -> void:
-	var sandbox := get_parent()
-	if sandbox != null and sandbox.has_method("cycle_player"):
-		sandbox.call("cycle_player", 1)
 
 func _on_state_changed(state_name: StringName) -> void:
 	if ui != null:

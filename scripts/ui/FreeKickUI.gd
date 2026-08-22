@@ -6,8 +6,6 @@ const LEFT_SUPPORT_BOOT_TEXTURE := preload("res://assets/PumaAttacantoIZQ.png")
 signal restart_requested
 signal switch_foot_requested
 signal next_spot_requested
-signal prev_player_requested
-signal next_player_requested
 signal aim_toggle_pressed
 
 var ui_root: Control
@@ -273,10 +271,6 @@ class WindHud extends Control:
 @onready var switch_foot_button: Button = %SwitchFootButton
 @onready var next_spot_button: Button = %NextSpotButton
 
-var prev_player_button: Button
-var next_player_button: Button
-var player_profile_label: Label
-
 var kicking_foot := "right"
 var support_marker_hint: Control
 var support_zone_overlay: Control
@@ -311,16 +305,11 @@ func _ready() -> void:
 	support_marker_hint = _create_support_marker_hint()
 	goal_banner = _create_goal_banner()
 	wind_module = _create_wind_module()
-	_create_player_selector()
 	_apply_mvp_layout()
 	_center_score_hud()
 	restart_button.pressed.connect(func() -> void: restart_requested.emit())
 	switch_foot_button.pressed.connect(func() -> void: switch_foot_requested.emit())
 	next_spot_button.pressed.connect(func() -> void: next_spot_requested.emit())
-	if prev_player_button != null:
-		prev_player_button.pressed.connect(func() -> void: prev_player_requested.emit())
-	if next_player_button != null:
-		next_player_button.pressed.connect(func() -> void: next_player_requested.emit())
 
 func _update_uiroot_margins() -> void:
 	if ui_root == null:
@@ -502,33 +491,6 @@ func set_environment_info(distance: float, wind: Vector3) -> void:
 		score_hud.call("set_distance", distance)
 	if wind_module != null and wind_module.has_method("set_wind"):
 		wind_module.call("set_wind", wind)
-
-func set_player_profile_info(profile: FreeKickPlayerProfile) -> void:
-	if player_profile_label == null or profile == null:
-		return
-	var stats := profile.ensure_stats()
-	player_profile_label.text = "%s  ·  %s  ·  PWR %d  ACC %d  CRV %d  TEC %d" % [
-		profile.display_name,
-		profile.archetype.to_upper(),
-		roundi(stats.kick_power),
-		roundi(stats.free_kick_accuracy),
-		roundi(stats.curve),
-		roundi(stats.technique),
-	]
-
-func _create_player_selector() -> void:
-	var root := get_node_or_null("Root") as Control
-	var parent: Node = root if root != null else self
-	prev_player_button = Button.new()
-	prev_player_button.name = "PrevPlayerButton"
-	parent.add_child(prev_player_button)
-	next_player_button = Button.new()
-	next_player_button.name = "NextPlayerButton"
-	parent.add_child(next_player_button)
-	player_profile_label = Label.new()
-	player_profile_label.name = "PlayerProfileLabel"
-	player_profile_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	parent.add_child(player_profile_label)
 
 func _create_support_zone_overlay() -> Control:
 	var root := get_node_or_null("Root") as Control
@@ -1032,21 +994,6 @@ func _apply_mvp_layout() -> void:
 	_style_button(next_spot_button, next_spot_button.text)
 	_place_anchored(next_spot_button, Vector2(0.0, 1.0), Vector2(24.0, 110.0), Vector2(196.0, 40.0))
 	next_spot_button.visible = false
-	_style_button(prev_player_button, "<")
-	_place_anchored(prev_player_button, Vector2(1.0, 1.0), Vector2(24.0, 24.0), Vector2(64.0, 40.0))
-	_style_button(next_player_button, ">")
-	_place_anchored(next_player_button, Vector2(1.0, 1.0), Vector2(100.0, 24.0), Vector2(64.0, 40.0))
-	if player_profile_label != null:
-		_place_anchored(player_profile_label, Vector2(1.0, 1.0), Vector2(172.0, 20.0), Vector2(296.0, 48.0))
-		player_profile_label.add_theme_font_size_override("font_size", 12)
-		player_profile_label.add_theme_color_override("font_color", Color(0.82, 0.95, 1.0, 0.9))
-		player_profile_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		player_profile_label.text = "Player"
-		player_profile_label.visible = true
-	if prev_player_button != null:
-		prev_player_button.visible = true
-	if next_player_button != null:
-		next_player_button.visible = true
 
 func align_power_meter_to_ball(ball: Node3D, camera: Camera3D) -> void:
 	if ball == null or camera == null or power_meter == null:

@@ -36,7 +36,6 @@ var current_spot_goal_scored := false
 var game_over := false
 var completed_set_pieces: Array[Dictionary] = []
 var player_catalog: FreeKickPlayerCatalog = FreeKickPlayerCatalog.new()
-var player_index := 0
 
 func _ready() -> void:
 	wall_rng.randomize()
@@ -61,21 +60,7 @@ func _load_player_catalog() -> void:
 	var default_profile := player_catalog.default_profile()
 	if default_profile == null:
 		return
-	player_index = maxi(0, player_catalog.index_of(default_profile.id))
 	controller.set_player_profile(default_profile)
-
-func cycle_player(direction: int = 1) -> void:
-	if player_catalog.count() <= 0 or game_over:
-		return
-	player_index = wrapi(player_index + direction, 0, player_catalog.count())
-	var profile := player_catalog.get_at(player_index)
-	if profile == null:
-		return
-	controller.set_player_profile(profile)
-	# Keep the selected build across set pieces; restart the current attempt with preferred foot.
-	if current_spot_attempts > 0:
-		current_spot_attempts -= 1
-	_start_attempt(controller.preferred_kicking_foot())
 
 func cycle_set_piece_spot() -> void:
 	if game_over:

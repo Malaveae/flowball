@@ -6,12 +6,8 @@ const LEFT_SUPPORT_BOOT_TEXTURE := preload("res://assets/PumaAttacantoIZQ.png")
 signal restart_requested
 signal switch_foot_requested
 signal next_spot_requested
-signal aim_toggle_pressed
 
 var ui_root: Control
-var aim_toggle_button: Button
-var _aim_toggle_enabled := false
-var _aim_toggle_angle_mode := false
 
 var impact_pulse: Control
 var impact_pulse_progress := 0.0
@@ -281,6 +277,8 @@ var support_zone_marker_local := Vector2.ZERO
 var support_zone_has_marker := false
 var support_zone_aim_target := 0.0
 var support_zone_show_angle := false
+var support_zone_flash := 0.0  # decays via tween; set by flash_support_correction()
+var support_zone_flash_tween: Tween
 var goal_banner: Control
 var goal_banner_tween: Tween
 var goal_banner_text := "GOAL!"
@@ -297,7 +295,6 @@ func _ready() -> void:
 		ui_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_update_uiroot_margins()
 		get_viewport().size_changed.connect(_update_uiroot_margins)
-	_create_aim_toggle()
 	impact_pulse = _create_impact_pulse()
 	result_card = _create_result_card()
 	left_support_boot_texture = LEFT_SUPPORT_BOOT_TEXTURE
@@ -362,36 +359,6 @@ func _place_anchored(control: Control, anchor_point: Vector2, margin: Vector2, s
 	else:
 		control.offset_top = -margin.y - s.y
 		control.offset_bottom = -margin.y
-
-## Bottom-center AIM/PLANT toggle, reachable by the second thumb in landscape.
-func _create_aim_toggle() -> void:
-	aim_toggle_button = Button.new()
-	aim_toggle_button.name = "AimToggleButton"
-	aim_toggle_button.text = "AIM"
-	aim_toggle_button.disabled = true
-	aim_toggle_button.visible = false
-	aim_toggle_button.pressed.connect(func() -> void: aim_toggle_pressed.emit())
-	aim_toggle_button.add_theme_font_size_override("font_size", 16)
-	aim_toggle_button.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.85))
-	aim_toggle_button.add_theme_stylebox_override("normal", _make_panel_style(Color(0.0, 0.0, 0.0, 0.34), Color(1.0, 1.0, 1.0, 0.25), 1, 8))
-	aim_toggle_button.add_theme_stylebox_override("hover", _make_panel_style(Color(1.0, 1.0, 1.0, 0.12), Color(1.0, 1.0, 1.0, 0.5), 1, 8))
-	aim_toggle_button.add_theme_stylebox_override("pressed", _make_panel_style(Color(1.0, 1.0, 1.0, 0.18), Color(1.0, 0.86, 0.25, 0.72), 1, 8))
-	if ui_root != null:
-		ui_root.add_child(aim_toggle_button)
-	else:
-		add_child(aim_toggle_button)
-	_place_anchored(aim_toggle_button, Vector2(0.5, 1.0), Vector2(0.0, 24.0), Vector2(120.0, 52.0))
-
-func set_aim_toggle_enabled(enabled: bool) -> void:
-	_aim_toggle_enabled = enabled
-	if aim_toggle_button != null:
-		aim_toggle_button.visible = enabled
-		aim_toggle_button.disabled = not enabled
-
-func set_aim_toggle_mode(in_angle_mode: bool) -> void:
-	_aim_toggle_angle_mode = in_angle_mode
-	if aim_toggle_button != null:
-		aim_toggle_button.text = "PLANT" if in_angle_mode else "AIM"
 
 func _create_impact_pulse() -> Control:
 	var pulse := Control.new()
@@ -523,12 +490,18 @@ func _create_support_zone_overlay() -> Control:
 			overlay.draw_circle(marker, 6.0, Color(0.4, 1.0, 0.45, 0.95))
 			if support_zone_show_angle:
 				var aim_angle := deg_to_rad(support_zone_aim_target * 30.0)
-				var aim_end := marker + Vector2.UP.rotated(aim_angle) * 62.0
+				var aim_len := radius * 0.62
+				var aim_end := marker + Vector2.UP.rotated(aim_angle) * aim_len
+				# Legal fan +/-30 deg around the heel: limits visible without guessing.
+				overlay.draw_arc(marker, aim_len * 0.85, -PI / 2.0 - deg_to_rad(30.0), -PI / 2.0 + deg_to_rad(30.0), 24, Color(0.55, 0.9, 1.0, 0.35), 1.5)
 				overlay.draw_line(marker, aim_end, Color(1.0, 0.86, 0.22, 0.95), 3.0)
 				overlay.draw_circle(aim_end, 5.0, Color(1.0, 0.86, 0.22, 1.0))
 				_draw_support_foot_indicator(overlay, marker, true, aim_angle)
+			if support_zone_flash > 0.01:
+				# Green correction ring: the heel was clamped to the legal side.
+				overlay.draw_arc(marker, 24.0, 0.0, TAU, 32, Color(0.3, 1.0, 0.45, 0.8 * support_zone_flash), 3.0)
 		var side_text := "LEFT" if kicking_foot == "right" else "RIGHT"
-		overlay.draw_string(overlay.get_theme_default_font(), center + Vector2(-96.0, radius + 28.0), "Plant zone: %s side - drag then aim" % side_text, HORIZONTAL_ALIGNMENT_CENTER, 192.0, 13, Color(1, 1, 1, 0.7))
+		overlay.draw_string(overlay.get_theme_default_font(), center + Vector2(-96.0, radius + 28.0), "Plant zone: %s side - slide to aim" % side_text, HORIZONTAL_ALIGNMENT_CENTER, 192.0, 13, Color(1, 1, 1, 0.7))
 	)
 	if root != null:
 		root.add_child(overlay)
@@ -770,7 +743,6 @@ func show_power(power_value: float) -> void:
 
 func show_support_foot_sector(selected_foot: String, _difficulty: FreeKickDifficulty) -> void:
 	hide_all()
-	set_aim_toggle_enabled(false)
 	_set_active_step(2)
 	set_phase_progress(1.0, "")
 	var support_foot := _support_foot_for_kick(selected_foot)
@@ -783,7 +755,7 @@ func show_support_foot_sector(selected_foot: String, _difficulty: FreeKickDiffic
 		support_zone_has_marker = false
 		support_zone_show_angle = false
 		support_zone_overlay.queue_redraw()
-	_show_primary_instruction("Place support foot", "%s plant beside the ball. Release to lock position." % support_foot.capitalize())
+	_show_primary_instruction("Plant & aim", "%s plant beside the ball - slide to aim - release to shoot" % support_foot.capitalize())
 	set_status("PLANT - support: %s - kicking: %s" % [support_foot, selected_foot])
 
 func update_support_marker(local_pos: Vector2) -> void:
@@ -818,8 +790,23 @@ func update_support_foot_angle(angle: float, aim_target: float = 0.0) -> void:
 		support_zone_overlay.queue_redraw()
 	var foot_offset := support_zone_aim_target * 30.0
 	var target_label := "RIGHT POST" if aim_target > 0.25 else "LEFT POST" if aim_target < -0.25 else "CENTER"
-	feedback_label.text = "Aim: %s - foot %+.0f deg" % [target_label, foot_offset]
-	set_status("Aim %s - drag left/right, release to shoot setup" % target_label)
+	feedback_label.text = "Aim: %s - toe %+.0f deg" % [target_label, foot_offset]
+	set_status("%s - release to shoot" % target_label)
+
+## Brief green ring at the heel when the tap was clamped to the legal side.
+func flash_support_correction() -> void:
+	if support_zone_flash_tween != null and support_zone_flash_tween.is_valid():
+		support_zone_flash_tween.kill()
+	support_zone_flash = 1.0
+	if support_zone_overlay != null:
+		support_zone_overlay.queue_redraw()
+	support_zone_flash_tween = create_tween()
+	support_zone_flash_tween.tween_method(_set_zone_flash, 1.0, 0.0, 0.6)
+
+func _set_zone_flash(value: float) -> void:
+	support_zone_flash = value
+	if support_zone_overlay != null:
+		support_zone_overlay.queue_redraw()
 
 ## Shows how much aim angle the current plant distance allows (0..1).
 func update_support_angle_scale(scale: float) -> void:
@@ -866,7 +853,7 @@ func align_support_marker_hint(ball: Node3D, camera: Camera3D, selected_foot: St
 	support_zone_center = camera.unproject_position(ball.global_position)
 	var camera_right := camera.global_transform.basis.x.normalized()
 	var radius_edge := camera.unproject_position(ball.global_position + camera_right * 1.05)
-	support_zone_radius = clampf(absf(radius_edge.x - support_zone_center.x), 95.0, 190.0)
+	support_zone_radius = clampf(absf(radius_edge.x - support_zone_center.x), 120.0, 230.0)
 	if support_zone_has_marker:
 		support_zone_marker_local = world_offset * support_zone_radius
 	if support_zone_overlay != null and support_zone_overlay.visible:

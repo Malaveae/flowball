@@ -1,9 +1,11 @@
 class_name SupportFootState
 extends FreeKickState
 
-enum Substep { LOCATION, ANGLE }
-
-signal plant_legality_changed(legal: bool)
+## Step 2: unified "plant & aim" gesture (touch and mouse share one code path).
+## Press places the heel (clamped to the legal support-foot side); dragging
+## without releasing points the toe radially toward the finger within +/-30
+## degrees; releasing commits immediately. A tap without drag commits a neutral
+## 0-degree aim. Timeout commits defaults, exactly like before.
 
 var elapsed := 0.0
 var touch_elapsed := 0.0
@@ -13,8 +15,8 @@ var foot_angle := 0.0
 var aim_target := 0.0
 var radius := 160.0
 var has_marker := false
-var substep: Substep = Substep.LOCATION
-var _drag_index := -1  # touch index of the primary dragging thumb
+var _gesture_active := false
+var _gesture_index := -1
 
 func enter(_controller: FreeKickController) -> void:
 	super.enter(_controller)
@@ -22,22 +24,23 @@ func enter(_controller: FreeKickController) -> void:
 	touch_elapsed = 0.0
 	touching = false
 	has_marker = false
-	substep = Substep.LOCATION
 	foot_angle = 0.0
 	aim_target = 0.0
-	_drag_index = -1
+	_gesture_active = false
+	_gesture_index = -1
 	controller.camera_rig.set_mode(&"SUPPORT_TOP_DOWN")
 	controller.ui.show_support_foot_sector(controller.input_data.selected_foot, controller.difficulty)
 	controller.ui.update_support_marker(Vector2(-radius * 0.55 if controller.input_data.selected_foot == "right" else radius * 0.55, 0.0))
-	_update_plant_legality_ui()
 
 func _process(delta: float) -> void:
 	elapsed += delta
-	var step_text := "1/2 LOCATION - release to lock" if substep == Substep.LOCATION else "2/2 FOOT ANGLE - release to continue"
 	var time_limit := controller.effective_step_time_limit(2)
 	var remaining := maxf(0.0, time_limit - elapsed)
 	controller.ui.set_phase_progress(remaining / maxf(0.001, time_limit), "%.1fs" % remaining)
-	controller.ui.set_status("PLANT %s - %.1fs" % [step_text, remaining])
+	if has_marker:
+		controller.ui.set_status("PLANT - slide to aim - release to shoot - %.1fs" % remaining)
+	else:
+		controller.ui.set_status("PLANT - tap to plant your heel - %.1fs" % remaining)
 	_align_world_marker()
 	if touching:
 		touch_elapsed += delta
@@ -45,72 +48,55 @@ func _process(delta: float) -> void:
 		_commit(true)
 
 func _input(event: InputEvent) -> void:
-	var pos: Vector2
-	var should_update := false
-	var released := false
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		pos = event.position
+	if event is InputEventScreenTouch:
 		if event.pressed:
-			touching = true
-			touch_elapsed = 0.0
-			should_update = true
-		else:
-			released = true
-	elif event is InputEventMouseMotion and touching:
-		pos = event.position
-		should_update = true
-	elif event is InputEventScreenTouch:
-		pos = event.position
+			_begin_gesture(event.index, event.position)
+		elif event.index == _gesture_index:
+			_end_gesture()
+	elif event is InputEventScreenDrag and _gesture_active and event.index == _gesture_index:
+		_drag_to(event.position)
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
-			touching = true
-			touch_elapsed = 0.0
-			should_update = true
-		else:
-			released = true
-	elif event is InputEventScreenDrag:
-		pos = event.position
-		should_update = true
+			_begin_gesture(0, event.position)
+		elif _gesture_active:
+			_end_gesture()
+	elif event is InputEventMouseMotion and _gesture_active:
+		_drag_to(event.position)
 
-	if should_update:
-		_update_from_screen(pos)
-		get_viewport().set_input_as_handled()
-	elif released:
-		touching = false
-		var action := SupportGestureRouter.resolve_release(substep, has_marker)
-		match action:
-			SupportGestureRouter.Action.ADVANCE_SUBSTEP:
-				substep = Substep.ANGLE
-				controller.ui.set_aim_toggle_mode(true)
-				controller.ui.update_support_foot_angle(foot_angle, aim_target)
-			SupportGestureRouter.Action.COMMIT:
-				_commit(false)
-			_:
-				pass
-		get_viewport().set_input_as_handled()
+## Press: plant the heel at the touch point, clamped to the legal side.
+func _begin_gesture(index: int, screen_pos: Vector2) -> void:
+	_gesture_index = index
+	_gesture_active = true
+	touching = true
+	touch_elapsed = 0.0
+	var local := _screen_to_ball_local(screen_pos)
+	var clamped := FreeKickInputMapper.clamp_to_support_foot_side(local, radius, controller.input_data.selected_foot)
+	var corrected := clamped.distance_to(local) > 8.0
+	marker_local = clamped
+	has_marker = true
+	foot_angle = 0.0
+	aim_target = 0.0
+	controller.ui.update_support_marker(marker_local)
+	if corrected:
+		controller.ui.flash_support_correction()
+	get_viewport().set_input_as_handled()
 
-func _update_from_screen(pos: Vector2) -> void:
-	var local := _screen_to_ball_local(pos)
-	if substep == Substep.LOCATION:
-		var target_marker := FreeKickInputMapper.clamp_to_support_foot_side(local, radius, controller.input_data.selected_foot)
-		marker_local = target_marker if not has_marker else marker_local.lerp(target_marker, 0.45)
-		has_marker = true
-		foot_angle = marker_local.angle() if marker_local.length() > 0.001 else 0.0
-		controller.ui.update_support_marker(marker_local)
-		_update_plant_legality_ui()
-		# Live feedback: the plant distance gates how wide the aim lane can open.
-		var support := FreeKickInputMapper.support_vector_from_marker(marker_local, radius)
-		controller.ui.update_support_angle_scale(ShotCalculator.support_angle_scale(support))
-	else:
-		# Substep 2 is a stable left/right aim slider, not a free rotation around the plant foot.
-		# This avoids twitchy angle jumps when the finger is close to the planted marker.
-		# Drag left = left post, center = center, drag right = right post.
-		var aim_width := radius * 0.75
-		var horizontal_offset := 0.0 if aim_width <= 0.0 else (local.x - marker_local.x) / aim_width
-		aim_target = clampf(horizontal_offset, -1.0, 1.0)
-		var max_offset := deg_to_rad(30.0)
-		var clamped_offset := aim_target * max_offset
-		foot_angle = Vector2.UP.rotated(clamped_offset).angle()
-		controller.ui.update_support_foot_angle(foot_angle, aim_target)
+## Drag while pressed: point the toe radially toward the finger.
+func _drag_to(screen_pos: Vector2) -> void:
+	if not has_marker:
+		return
+	var local := _screen_to_ball_local(screen_pos)
+	aim_target = SupportPlantGesture.aim_target_from_toe(marker_local, local)
+	foot_angle = SupportPlantGesture.toe_direction(aim_target).angle()
+	controller.ui.update_support_foot_angle(foot_angle, aim_target)
+	get_viewport().set_input_as_handled()
+
+## Release: commit the step immediately (neutral aim if the heel was never dragged).
+func _end_gesture() -> void:
+	_gesture_active = false
+	_gesture_index = -1
+	touching = false
+	_commit(not has_marker)
 
 func _align_world_marker() -> void:
 	var ball := controller.get_ball()
@@ -136,36 +122,6 @@ func _screen_to_ball_local(screen_pos: Vector2) -> Vector2:
 	var pixels := screen_pos - center
 	var meters := pixels / px_per_meter
 	return meters * radius
-
-## Toggle entry point called by the UI's AIM/PLANT button (second thumb on touch).
-func set_aim_toggle_requested() -> void:
-	var legal := _is_plant_legal()
-	var action := SupportGestureRouter.resolve_touch_press(substep, has_marker, true, legal)
-	match action:
-		SupportGestureRouter.Action.TOGGLE_TO_ANGLE:
-			substep = Substep.ANGLE
-			controller.ui.set_aim_toggle_mode(true)
-			controller.ui.update_support_foot_angle(foot_angle, aim_target)
-		SupportGestureRouter.Action.TOGGLE_TO_LOCATION:
-			substep = Substep.LOCATION
-			controller.ui.set_aim_toggle_mode(false)
-		_:
-			pass
-
-## Single source of truth for plant legality: marker must sit on the physical
-## support-foot side (right kick -> support foot plants left of the ball).
-func _is_plant_legal() -> bool:
-	if not has_marker:
-		return false
-	var support := FreeKickInputMapper.support_vector_from_marker(marker_local, radius)
-	if controller.input_data.selected_foot == "right":
-		return support.x < -0.05
-	return support.x > 0.05
-
-func _update_plant_legality_ui() -> void:
-	var legal := _is_plant_legal()
-	plant_legality_changed.emit(legal)
-	controller.ui.set_aim_toggle_enabled(legal)
 
 func _commit(use_default: bool) -> void:
 	if use_default or not has_marker:
@@ -211,7 +167,7 @@ func _support_quality(support: Vector2) -> float:
 
 func _support_angle_quality(target: float) -> float:
 	# 0 = foot points at target for straight/power. 10-25 degrees open is still good for curl.
-	# The aim slider maps to about +/-30 degrees visually, so full extremes trade control for shape.
+	# The radial gesture maps to about +/-30 degrees visually, so full extremes trade control for shape.
 	var open_amount := absf(clampf(target, -1.0, 1.0))
 	if open_amount <= 0.55:
 		return 1.0

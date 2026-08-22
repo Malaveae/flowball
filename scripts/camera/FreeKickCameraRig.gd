@@ -10,6 +10,8 @@ signal mode_changed(mode: StringName)
 @export var match_view_transform := Transform3D(Basis(), Vector3(0.0, 7.0, 8.0))
 @export var power_view_transform := Transform3D(Basis(), Vector3(0.0, 6.0, 7.0))
 @export var support_view_transform := Transform3D(Basis(), Vector3(0.0, 9.0, 0.01))
+# Step 2 top-down framing: lower height = larger on-screen targets for the plant gesture.
+@export var support_top_down_height := 4.2
 # Step 3: tight first-person-ish ball view so the player touches/swipes over the ball in foreground.
 @export var contact_view_transform := Transform3D(Basis(), Vector3(0.0, 0.42, 0.85))
 # After contact, drop to a low chase angle to appreciate ball flight and curve.
@@ -141,7 +143,7 @@ func _goal_centered_transform(next_mode: StringName) -> Transform3D:
 func _support_top_down_transform() -> Transform3D:
 	# Step 2 uses the real ball from a zenith camera instead of a 2D overlay panel.
 	var ball := _target_position()
-	var origin := ball + Vector3.UP * 5.2
+	var origin := ball + Vector3.UP * support_top_down_height
 	return Transform3D(Basis.looking_at(Vector3.DOWN, Vector3.FORWARD), origin)
 
 func _ball_contact_transform() -> Transform3D:

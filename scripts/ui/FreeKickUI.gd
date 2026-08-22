@@ -308,12 +308,38 @@ func _update_uiroot_margins() -> void:
 	# get_display_safe_area is monitor-relative; convert to window-relative first.
 	var safe_screen := DisplayServer.get_display_safe_area()
 	var win_pos := Vector2(DisplayServer.window_get_position())
-	var safe_window := Rect2(safe_screen.position - win_pos, safe_screen.size)
+	var safe_window := Rect2(Vector2(safe_screen.position) - win_pos, Vector2(safe_screen.size))
 	var safe_viewport := FreeKickUIScale.viewport_safe_area(viewport_size, screen_size, safe_window)
 	ui_root.offset_left = maxf(0.0, safe_viewport.position.x)
 	ui_root.offset_top = maxf(0.0, safe_viewport.position.y)
 	ui_root.offset_right = -maxf(0.0, viewport_size.x - safe_viewport.end.x)
 	ui_root.offset_bottom = -maxf(0.0, viewport_size.y - safe_viewport.end.y)
+	if score_hud != null:
+		score_hud.scale = Vector2.ONE * FreeKickUIScale.widget_scale(viewport_size.y)
+		_center_score_hud()
+
+## Positions `control` inside ui_root at a normalized anchor point (0..1) with an edge margin.
+## Sizes scale with the widget scale; margins stay in viewport px (stretch already scales them).
+func _place_anchored(control: Control, anchor_point: Vector2, margin: Vector2, size_value: Vector2) -> void:
+	if control == null or ui_root == null:
+		return
+	control.anchor_left = anchor_point.x
+	control.anchor_top = anchor_point.y
+	control.anchor_right = anchor_point.x
+	control.anchor_bottom = anchor_point.y
+	var s := size_value * FreeKickUIScale.widget_scale(ui_root.size.y if ui_root.size.y > 0.0 else 720.0)
+	if anchor_point.x < 0.5:
+		control.offset_left = margin.x
+		control.offset_right = margin.x + s.x
+	else:
+		control.offset_left = -margin.x - s.x
+		control.offset_right = -margin.x
+	if anchor_point.y < 0.5:
+		control.offset_top = margin.y
+		control.offset_bottom = margin.y + s.y
+	else:
+		control.offset_top = -margin.y - s.y
+		control.offset_bottom = -margin.y
 
 func hide_all() -> void:
 	power_label.visible = false
@@ -552,7 +578,7 @@ func _create_score_hud() -> Control:
 	var hud := ModernScoreHud.new()
 	hud.name = "ModernScoreHud"
 	hud.size = Vector2(980.0, 180.0)
-	hud.scale = Vector2(0.88, 0.88)
+	hud.scale = Vector2.ONE * FreeKickUIScale.widget_scale(720.0)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if root != null:
 		root.add_child(hud)
@@ -561,13 +587,16 @@ func _create_score_hud() -> Control:
 	return hud
 
 func _center_score_hud() -> void:
-	if score_hud == null:
+	if score_hud == null or ui_root == null:
 		return
-	var viewport_size := get_viewport().get_visible_rect().size
-	if viewport_size.x <= 0.0:
-		viewport_size = Vector2(1280.0, 720.0)
-	var visual_size := score_hud.size * score_hud.scale
-	score_hud.position = Vector2((viewport_size.x - visual_size.x) * 0.5, 20.0)
+	score_hud.anchor_left = 0.5
+	score_hud.anchor_right = 0.5
+	score_hud.anchor_top = 0.0
+	score_hud.anchor_bottom = 0.0
+	score_hud.offset_left = -score_hud.size.x * score_hud.scale.x * 0.5
+	score_hud.offset_right = score_hud.size.x * score_hud.scale.x * 0.5
+	score_hud.offset_top = 20.0
+	score_hud.offset_bottom = 20.0 + score_hud.size.y * score_hud.scale.y
 
 func set_kicking_foot(foot: String) -> void:
 	kicking_foot = foot
@@ -820,31 +849,32 @@ func _apply_mvp_layout() -> void:
 	power_meter.size = Vector2(150.0, 320.0)
 	power_meter.kicking_foot = kicking_foot
 	_position_power_meter_for_foot()
-	feedback_label.position = Vector2(24.0, 304.0)
-	feedback_label.size = Vector2(520.0, 58.0)
+	_place_anchored(feedback_label, Vector2(0.0, 0.0), Vector2(24.0, 60.0), Vector2(520.0, 58.0))
 	feedback_label.add_theme_font_size_override("font_size", 15)
 	feedback_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.82))
-	instruction_label.position = Vector2(24.0, 676.0)
-	instruction_label.size = Vector2(760.0, 28.0)
+	_place_anchored(instruction_label, Vector2(0.0, 1.0), Vector2(24.0, 64.0), Vector2(760.0, 28.0))
 	instruction_label.add_theme_font_size_override("font_size", 20)
 	instruction_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.9))
 	instruction_label.remove_theme_stylebox_override("normal")
-	status_label.position = Vector2(24.0, 642.0)
-	status_label.size = Vector2(520.0, 24.0)
+	_place_anchored(status_label, Vector2(0.0, 1.0), Vector2(24.0, 100.0), Vector2(520.0, 24.0))
 	status_label.add_theme_font_size_override("font_size", 12)
 	status_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.28))
 	status_label.remove_theme_stylebox_override("normal")
-	_style_button(restart_button, Vector2(24.0, 586.0), Vector2(158.0, 40.0), "Restart  R")
+	_style_button(restart_button, "Restart  R")
+	_place_anchored(restart_button, Vector2(0.0, 1.0), Vector2(24.0, 24.0), Vector2(158.0, 40.0))
 	restart_button.visible = false
-	_style_button(switch_foot_button, Vector2(24.0, 594.0), Vector2(128.0, 32.0), "Foot  F")
+	_style_button(switch_foot_button, "Foot  F")
+	_place_anchored(switch_foot_button, Vector2(0.0, 1.0), Vector2(24.0, 70.0), Vector2(128.0, 32.0))
 	switch_foot_button.visible = false
-	_style_button(next_spot_button, Vector2(214.0, 586.0), Vector2(196.0, 40.0), next_spot_button.text)
+	_style_button(next_spot_button, next_spot_button.text)
+	_place_anchored(next_spot_button, Vector2(0.0, 1.0), Vector2(24.0, 110.0), Vector2(196.0, 40.0))
 	next_spot_button.visible = false
-	_style_button(prev_player_button, Vector2(820.0, 586.0), Vector2(64.0, 40.0), "<")
-	_style_button(next_player_button, Vector2(1196.0, 586.0), Vector2(64.0, 40.0), ">")
+	_style_button(prev_player_button, "<")
+	_place_anchored(prev_player_button, Vector2(1.0, 1.0), Vector2(24.0, 24.0), Vector2(64.0, 40.0))
+	_style_button(next_player_button, ">")
+	_place_anchored(next_player_button, Vector2(1.0, 1.0), Vector2(100.0, 24.0), Vector2(64.0, 40.0))
 	if player_profile_label != null:
-		player_profile_label.position = Vector2(892.0, 582.0)
-		player_profile_label.size = Vector2(296.0, 48.0)
+		_place_anchored(player_profile_label, Vector2(1.0, 1.0), Vector2(172.0, 20.0), Vector2(296.0, 48.0))
 		player_profile_label.add_theme_font_size_override("font_size", 12)
 		player_profile_label.add_theme_color_override("font_color", Color(0.82, 0.95, 1.0, 0.9))
 		player_profile_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -882,9 +912,7 @@ func _position_power_meter_for_foot() -> void:
 	if power_label != null:
 		power_label.position = Vector2(x, 204.0)
 
-func _style_button(button: Button, pos: Vector2, size_value: Vector2, text_value: String) -> void:
-	button.position = pos
-	button.size = size_value
+func _style_button(button: Button, text_value: String) -> void:
 	button.text = text_value
 	button.add_theme_font_size_override("font_size", 13)
 	button.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.78))

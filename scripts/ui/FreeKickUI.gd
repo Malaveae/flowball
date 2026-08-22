@@ -9,6 +9,8 @@ signal next_spot_requested
 signal prev_player_requested
 signal next_player_requested
 
+var ui_root: Control
+
 class ModernScoreHud:
 	extends Control
 
@@ -274,6 +276,12 @@ var goal_banner_alpha := 1.0
 var wind_module: Control
 
 func _ready() -> void:
+	ui_root = get_node_or_null("Root") as Control
+	if ui_root != null:
+		ui_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+		ui_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_update_uiroot_margins()
+		get_viewport().size_changed.connect(_update_uiroot_margins)
 	left_support_boot_texture = LEFT_SUPPORT_BOOT_TEXTURE
 	support_zone_overlay = _create_support_zone_overlay()
 	support_marker_hint = _create_support_marker_hint()
@@ -289,6 +297,23 @@ func _ready() -> void:
 		prev_player_button.pressed.connect(func() -> void: prev_player_requested.emit())
 	if next_player_button != null:
 		next_player_button.pressed.connect(func() -> void: next_player_requested.emit())
+
+func _update_uiroot_margins() -> void:
+	if ui_root == null:
+		return
+	var viewport_size := get_viewport().get_visible_rect().size
+	if viewport_size.x <= 0.0:
+		viewport_size = Vector2(1280.0, 720.0)
+	var screen_size := Vector2(DisplayServer.screen_get_size())
+	# get_display_safe_area is monitor-relative; convert to window-relative first.
+	var safe_screen := DisplayServer.get_display_safe_area()
+	var win_pos := Vector2(DisplayServer.window_get_position())
+	var safe_window := Rect2(safe_screen.position - win_pos, safe_screen.size)
+	var safe_viewport := FreeKickUIScale.viewport_safe_area(viewport_size, screen_size, safe_window)
+	ui_root.offset_left = maxf(0.0, safe_viewport.position.x)
+	ui_root.offset_top = maxf(0.0, safe_viewport.position.y)
+	ui_root.offset_right = -maxf(0.0, viewport_size.x - safe_viewport.end.x)
+	ui_root.offset_bottom = -maxf(0.0, viewport_size.y - safe_viewport.end.y)
 
 func hide_all() -> void:
 	power_label.visible = false

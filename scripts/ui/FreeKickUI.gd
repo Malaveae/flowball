@@ -1009,12 +1009,14 @@ func align_power_meter_to_ball(ball: Node3D, camera: Camera3D) -> void:
 func _position_power_meter_for_foot() -> void:
 	if power_meter == null:
 		return
-	var viewport_width := get_viewport().get_visible_rect().size.x
-	if viewport_width <= 0.0:
-		viewport_width = 1280.0
-	var center_x := viewport_width * 0.5
+	var viewport_size := get_viewport().get_visible_rect().size
+	if viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
+		viewport_size = Vector2(1280.0, 720.0)
+	# Vertically centered relative to the live viewport so the meter sits mid-screen
+	# on any device (phones expand the design space; a fixed y drifts upward there).
+	var center_x := viewport_size.x * 0.5
 	var side := 1.0 if kicking_foot == "right" else -1.0
-	var desired := Vector2(center_x + side * 145.0 - power_meter.size.x * 0.5, 250.0)
+	var desired := Vector2(center_x + side * 145.0 - power_meter.size.x * 0.5, (viewport_size.y - power_meter.size.y) * 0.5)
 	power_meter.position = _clamp_to_uiroot(desired, power_meter.size)
 	if power_label != null:
 		power_label.position = power_meter.position + Vector2(0.0, -46.0)

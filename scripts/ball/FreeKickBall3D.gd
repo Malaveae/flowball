@@ -9,6 +9,7 @@ signal came_to_rest
 @export_file("*.png") var ball_albedo_texture_path := "res://assets/trionda.png"
 
 var active_shot: ShotParams
+var trail_node: BallFlightTrail  # deterministic flight trail, created by ExecuteShotState
 var _rest_time := 0.0
 var _net_capture_active := false
 @onready var aerodynamics: BallAerodynamics3D = get_node_or_null("BallAerodynamics3D")

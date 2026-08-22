@@ -125,6 +125,8 @@ func _finish_shot(outcome: StringName) -> void:
 	if controller.shot_observer != null:
 		controller.shot_observer.record_sample_now()
 		controller.shot_observer.stop_recording(outcome)
+	if _launched_ball != null and _launched_ball.trail_node != null:
+		_launched_ball.trail_node.stop_and_fade()
 	finished.emit(&"FeedbackState")
 
 func _show_outcome_banner(outcome: StringName) -> void:

@@ -1,6 +1,7 @@
 # Local Pi runtime state
 .atl/
 .pi/
+extensions/skill-registry.ts
 
 # Godot generated state (editor layouts, import caches, compiled textures)
 # Track forced removals via `git rm -r --cached .godot/` once, then ignore entirely.
@@ -9,3 +10,6 @@
 # Python build/pycache
 __pycache__/
 *.pyc
+
+# Superpowers isolated worktrees
+.worktrees/

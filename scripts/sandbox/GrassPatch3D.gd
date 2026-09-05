@@ -18,7 +18,9 @@ extends MultiMeshInstance3D
 @export var area_center := Vector3(0.0, 0.0, 0.0)
 @export var area_size := Vector2(24.0, 32.0)       # metres along X and Z
 @export var density := 196.0                     # blades per m²
+@export var density_web := 35.0                  # blades per m² when running in a web browser (mobile GPUs)
 @export var max_instances := 100000                  # safety cap
+@export var max_instances_web := 30000               # safety cap for web/mobile
 
 # --- Blade dimensions (each quad) ---
 @export var blade_width := 0.008
@@ -70,8 +72,11 @@ func _populate():
 	quad.size = Vector2(blade_width, blade_height)
 
 	# --- Instance count ---
+	var is_web := OS.has_feature("web")
+	var effective_density := density_web if is_web else density
+	var effective_cap := max_instances_web if is_web else max_instances
 	var area := area_size.x * area_size.y
-	var count := mini(int(area * density), max_instances)
+	var count := mini(int(area * effective_density), effective_cap)
 
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D

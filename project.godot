@@ -18,6 +18,13 @@ config/name="Flowball Free Kick Prototype"
 run/main_scene="res://scenes/sandbox/FreeKickSandbox.tscn"
 config/features=PackedStringArray("4.6")
 
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
 [input]
 
 free_kick_power={
@@ -42,13 +49,4 @@ free_kick_switch_foot={
 [physics]
 
 3d/physics_engine="Jolt Physics"
-
-[display]
-
-window/size/viewport_width=1280
-window/size/viewport_height=720
-window/stretch/mode="canvas_items"
-window/stretch/aspect="expand"
-
-[rendering]
-renderer/rendering_method.web="gl_compatibility"
+common/physics_interpolation=true

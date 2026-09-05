@@ -30,4 +30,5 @@ func transition_to(state_name: StringName) -> void:
 	state_changed.emit(state_name)
 
 func _on_state_finished(next_state: StringName) -> void:
+	print("DEBUG StateMachine: received finished signal for ", next_state)
 	transition_to(next_state)

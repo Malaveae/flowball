@@ -188,9 +188,13 @@ func _stop_motion_tween() -> void:
 	_motion_tween = null
 
 func _start_idle_motion() -> void:
-	_idle_active = true
 	if skeleton != null:
+		# Real rig: the imported animation drives the idle pose. Do NOT run the
+		# procedural bone override, otherwise it fights the animation and the
+		# keeper snaps toward a procedural rest pose instead of the gk_idle clip.
+		_idle_active = false
 		return
+	_idle_active = true
 	if model == null:
 		return
 	_stop_idle_tween()

@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bbwbxl48wvke2"
-path="res://.godot/imported/goalkeeper_textured_mesh_0.png-b65523d36dd055cd9637f76dd8549fe3.ctex"
+path.s3tc="res://.godot/imported/goalkeeper_textured_mesh_0.png-b65523d36dd055cd9637f76dd8549fe3.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "2f2ffac5d19c37115017e2b14d3a2155"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/goalkeeper_textured_mesh_0.png"
-dest_files=["res://.godot/imported/goalkeeper_textured_mesh_0.png-b65523d36dd055cd9637f76dd8549fe3.ctex"]
+dest_files=["res://.godot/imported/goalkeeper_textured_mesh_0.png-b65523d36dd055cd9637f76dd8549fe3.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

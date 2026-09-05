@@ -1,0 +1,5 @@
+res://scenes/actors/Goalkeeper.tscn::5ed25dfefef3875f772a69f859b31886::1786989131::res://.godot/exported/133200997/export-4d4b92e097c5ff1f51e164a79be8a996-Goalkeeper.scn
+res://scenes/free_kick/Ball3D.tscn::c79fd45dd4471f048e12b863a13cd64a::1780852103::res://.godot/exported/133200997/export-43dcfc5a530d8d9b0b19f0fa0cf7c3e6-Ball3D.scn
+res://scenes/free_kick/FreeKickController.tscn::944ab69a257956647a462ac8cd83bc26::1787087691::res://.godot/exported/133200997/export-3024890e78859c0046394cfcc7ff1f89-FreeKickController.scn
+res://scenes/sandbox/FreeKickSandbox.tscn::248eecd5bf6b7b626e646ab8d6b82525::1786877032::res://.godot/exported/133200997/export-b96ff2656572ca49f45d43cf1f6395aa-FreeKickSandbox.scn
+res://scenes/sandbox/GrassPatch.tscn::b679a57e4fc68bf3c9d4a60929d0241e::1786649328::res://.godot/exported/133200997/export-b3a74e7566d7fbcb3b7fe93f8381caae-GrassPatch.scn

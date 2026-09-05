@@ -1,0 +1,48 @@
+# Flowball SDD Configuration
+# Initialized: 2026-08-17
+
+project: flowball
+engine: godot-4.6
+language: gdscript
+physics: jolt-3d
+
+context: |
+  Flowball is a Godot 4.6 free-kick prototype using Jolt physics.
+  Core gameplay: state-machine-driven free kicks with 3-step input
+  (power → support-foot placement → ball contact/swipe).
+  ShotCalculator is deterministic for identical inputs.
+  Architecture: layered (Input → Orchestration → Calculation → Simulation → Presentation → Telemetry).
+
+strict_tdd: true
+
+testing:
+  runner: godot-headless
+  command: "godot --headless --script scripts/tests/ShotCalculatorSmokeTest.gd"
+  framework: gdscript-scene-tree
+  layers:
+    unit: true
+    integration: false
+    e2e: false
+  coverage:
+    available: false
+    command: null
+  quality:
+    linter: null
+    type_checker: null
+    formatter: null
+
+phases:
+  propose:
+    required_inputs: [exploration]
+  spec:
+    required_inputs: [proposal]
+  design:
+    required_inputs: [proposal]
+  tasks:
+    required_inputs: [spec, design]
+  apply:
+    required_inputs: [tasks, spec, design]
+  verify:
+    required_inputs: [spec, tasks, apply-progress]
+  archive:
+    required_inputs: [all-artifacts]

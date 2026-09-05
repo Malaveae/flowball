@@ -17,7 +17,7 @@ script = ExtResource("1_goalkeeper_controller")
 animation_player_path = NodePath("Model/ImportedGoalkeeper/AnimationPlayer")
 
 [node name="Model" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.228, 0)
 
 [node name="ImportedGoalkeeper" parent="Model" instance=ExtResource("2_goalkeeper_model")]
 

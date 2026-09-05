@@ -18,6 +18,9 @@ var has_marker := false
 var _gesture_active := false
 var _gesture_index := -1
 
+## Mouse/touch drag sensitivity (lower = less sensitive). Tune to comfort.
+const DRAG_SENSITIVITY := 0.3
+
 func enter(_controller: FreeKickController) -> void:
 	super.enter(_controller)
 	elapsed = 0.0
@@ -35,6 +38,9 @@ func enter(_controller: FreeKickController) -> void:
 func _process(delta: float) -> void:
 	elapsed += delta
 	var time_limit := controller.effective_step_time_limit(2)
+	# DEBUG
+	if int(elapsed * 10) % 10 == 0:
+		print("DEBUG Step2: elapsed=", elapsed, " time_limit=", time_limit)
 	var remaining := maxf(0.0, time_limit - elapsed)
 	controller.ui.set_phase_progress(remaining / maxf(0.001, time_limit), "%.1fs" % remaining)
 	if has_marker:
@@ -44,7 +50,9 @@ func _process(delta: float) -> void:
 	_align_world_marker()
 	if touching:
 		touch_elapsed += delta
-	elif elapsed >= time_limit:
+	# Timer always checks, even if mouse is held down
+	if elapsed >= time_limit:
+		print("DEBUG: Timer expired, calling _commit(true)")
 		_commit(true)
 
 func _input(event: InputEvent) -> void:
@@ -86,6 +94,10 @@ func _drag_to(screen_pos: Vector2) -> void:
 	if not has_marker:
 		return
 	var local := _screen_to_ball_local(screen_pos)
+	# Reduce drag sensitivity to prevent over-sensitive aiming
+	var delta := local - marker_local
+	delta *= DRAG_SENSITIVITY
+	local = marker_local + delta
 	aim_target = SupportPlantGesture.aim_target_from_toe(marker_local, local)
 	foot_angle = SupportPlantGesture.toe_direction(aim_target).angle()
 	controller.ui.update_support_foot_angle(foot_angle, aim_target)
@@ -124,6 +136,7 @@ func _screen_to_ball_local(screen_pos: Vector2) -> Vector2:
 	return meters * radius
 
 func _commit(use_default: bool) -> void:
+	print("DEBUG _commit: use_default=", use_default, " has_marker=", has_marker, " elapsed=", elapsed)
 	if use_default or not has_marker:
 		controller.input_data.support_vector = Vector2.ZERO
 		controller.input_data.plant_depth = 0.0
@@ -144,6 +157,7 @@ func _commit(use_default: bool) -> void:
 		controller.input_data.support_angle_quality = _support_angle_quality(aim_target)
 	if not use_default:
 		controller._step2_end_msec = Time.get_ticks_msec()
+	print("DEBUG: Emitting finished signal to BallContactState")
 	finished.emit(&"BallContactState")
 
 func _support_quality(support: Vector2) -> float:
@@ -172,3 +186,4 @@ func _support_angle_quality(target: float) -> float:
 	if open_amount <= 0.55:
 		return 1.0
 	return lerpf(0.86, 0.62, (open_amount - 0.55) / 0.45)
+

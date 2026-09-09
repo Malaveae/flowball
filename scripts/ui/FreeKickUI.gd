@@ -39,11 +39,19 @@ class ModernScoreHud:
 	var phase_fill := 0.0
 	var phase_time_text := ""
 	var _pulse := 0.0
-	const PHASE_LABELS := ["[1. POWER]", "[2. PLANT]", "[3. CONTACT]"]
+	const PHASE_LABELS := ["[1] POWER", "[2] PLANT", "[3] KICK"]
 	const PHASE_CYAN := Color(0.0, 0.86, 1.0)
 	const PHASE_ORANGE := Color(1.0, 0.62, 0.18)
 	const PHASE_RED := Color(1.0, 0.25, 0.20)
+	# Retro Arcade palette
+	const NEON_CYAN := Color(0.0, 1.0, 1.0)
+	const NEON_MAGENTA := Color(1.0, 0.0, 1.0)
+	const NEON_YELLOW := Color(1.0, 1.0, 0.0)
+	const NEON_ORANGE := Color(1.0, 0.56, 0.0)
+	const NEON_ORANGE_DIM := Color(1.0, 0.56, 0.0, 0.55)
+	const NEON_ORANGE_BRIGHT := Color(1.0, 0.68, 0.18)
 	var distance_to_goal: float = 24.0
+	var angle_to_goal: float = 0.0
 
 	func _ready() -> void:
 		process_mode = Node.PROCESS_MODE_ALWAYS
@@ -79,6 +87,10 @@ class ModernScoreHud:
 
 	func set_distance(distance: float) -> void:
 		distance_to_goal = distance
+		queue_redraw()
+
+	func set_angle(angle: float) -> void:
+		angle_to_goal = angle
 		queue_redraw()
 
 
@@ -122,37 +134,27 @@ class ModernScoreHud:
 
 	func _draw_level(font: Font, rect: Rect2) -> void:
 		draw_string(font, rect.position + Vector2(0.0, 16.0), "SET PIECE", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 11, Color(0.6, 0.78, 0.92, 0.7))
-		draw_string(font, rect.position + Vector2(0.0, 60.0), "%02d" % level, HORIZONTAL_ALIGNMENT_LEFT, 88.0, 42, Color(0.08, 0.84, 1.0, 1.0))
-		var split_x := rect.position.x + 88.0
-		draw_line(Vector2(split_x, rect.position.y + 22.0), Vector2(split_x, rect.position.y + 96.0), Color(1.0, 1.0, 1.0, 0.12), 1.0)
-		var right_x := split_x + 10.0
-		var right_w := rect.size.x - 98.0
-		var row1_y := rect.position.y + 50.0
-		# DIST label and value inline
-		draw_circle(Vector2(right_x + 3.0, row1_y - 4.0), 2.5, Color(0.4, 0.85, 1.0, 0.8))
-		draw_line(Vector2(right_x + 3.0, row1_y - 1.5), Vector2(right_x + 3.0, row1_y + 2.5), Color(0.4, 0.85, 1.0, 0.5), 1.2)
-		draw_string(font, Vector2(right_x + 10.0, row1_y - 3.0), "DIST", HORIZONTAL_ALIGNMENT_LEFT, 30.0, 9, Color(0.55, 0.7, 0.85, 0.6))
-		draw_string(font, Vector2(right_x + 42.0, row1_y), "%.1f m" % distance_to_goal, HORIZONTAL_ALIGNMENT_LEFT, right_w - 42.0, 15, Color(0.78, 0.95, 1.0, 0.95))
+		draw_string(font, rect.position + Vector2(0.0, 68.0), "%02d" % level, HORIZONTAL_ALIGNMENT_LEFT, 200.0, 46, Color(0.08, 0.84, 1.0, 1.0))
 
 	func _draw_effectiveness(font: Font, rect: Rect2, effectiveness: float) -> void:
-		draw_string(font, rect.position + Vector2(0.0, 21.0), "CONVERSION", HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 17, Color(1.0, 1.0, 1.0, 0.88))
+		draw_string(font, rect.position + Vector2(0.0, 21.0), "CONVERSION", HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 17, Color(NEON_ORANGE, 0.88))
 		var pct := "%d%%" % roundi(effectiveness * 100.0)
 		var ratio := "%d/%d" % [goals, max(1, attempts)]
-		draw_string(font, rect.position + Vector2(0.0, 74.0), pct, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x * 0.48, 43, Color(0.62, 1.0, 0.16, 1.0))
-		draw_circle(rect.position + Vector2(rect.size.x * 0.50, 55.0), 4.0, Color(0.62, 1.0, 0.16, 1.0))
+		draw_string(font, rect.position + Vector2(0.0, 74.0), pct, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x * 0.48, 43, Color(NEON_ORANGE_BRIGHT, 1.0))
+		draw_circle(rect.position + Vector2(rect.size.x * 0.50, 55.0), 4.0, Color(NEON_ORANGE, 1.0))
 		draw_string(font, rect.position + Vector2(rect.size.x * 0.58, 74.0), ratio, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x * 0.42, 43, Color(1.0, 1.0, 1.0, 0.92))
 
 	func _draw_misses(font: Font, rect: Rect2) -> void:
-		draw_string(font, rect.position + Vector2(0.0, 21.0), "MISSES", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 17, Color(1.0, 1.0, 1.0, 0.88))
+		draw_string(font, rect.position + Vector2(0.0, 21.0), "MISSES", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 17, Color(NEON_ORANGE, 0.88))
 		for i in range(max_misses):
 			var center := rect.position + Vector2(24.0 + float(i) * 48.0, 59.0)
 			var used := i < misses
-			var fill := Color(1.0, 0.08, 0.04, 0.88) if used else Color(0.0, 0.0, 0.0, 0.20)
-			var stroke := Color(1.0, 0.14, 0.08, 1.0) if used else Color(1.0, 1.0, 1.0, 0.55)
+			var fill := Color(NEON_ORANGE, 0.88) if used else Color(0.0, 0.0, 0.0, 0.15)
+			var stroke := NEON_ORANGE_BRIGHT if used else Color(NEON_ORANGE, 0.45)
 			draw_circle(center, 17.0, fill)
 			draw_arc(center, 17.0, 0.0, TAU, 48, stroke, 2.2)
 			if used:
-				draw_arc(center, 23.0, 0.0, TAU, 48, Color(1.0, 0.08, 0.04, 0.26), 5.0)
+				draw_arc(center, 23.0, 0.0, TAU, 48, Color(NEON_ORANGE, 0.26), 5.0)
 		draw_string(font, rect.position + Vector2(174.0, 67.0), "%d / %d" % [misses, max_misses], HORIZONTAL_ALIGNMENT_LEFT, 74.0, 27, Color(1.0, 1.0, 1.0, 0.92))
 
 	func _draw_progress_bar(rect: Rect2, value: float, accent: Color) -> void:
@@ -194,7 +196,7 @@ class ModernScoreHud:
 			var seg_rect := Rect2(bar_pos + Vector2(float(i) * (seg_w + gap), 1.0), Vector2(seg_w, bar_size.y - 2.0))
 			var fill := 1.0 if is_done else phase_fill if is_active else 0.0
 			if fill > 0.01:
-				var fill_color := PHASE_CYAN if is_done else PHASE_RED if is_active and low_time else PHASE_ORANGE
+				var fill_color := PHASE_CYAN if is_done else NEON_MAGENTA if is_active and low_time else NEON_YELLOW
 				var fill_rect := Rect2(seg_rect.position, Vector2(seg_rect.size.x * clampf(fill, 0.0, 1.0), seg_rect.size.y))
 				draw_rect(fill_rect, fill_color, true)
 				if is_active and step >= 2 and fill < 0.995:
@@ -203,10 +205,10 @@ class ModernScoreHud:
 			if i < 2:
 				var chevron_center := Vector2(seg_rect.end.x + gap * 0.5, bar_rect.get_center().y)
 				draw_colored_polygon(PackedVector2Array([chevron_center + Vector2(-3.0, -4.0), chevron_center + Vector2(3.0, 0.0), chevron_center + Vector2(-3.0, 4.0)]), Color(1.0, 1.0, 1.0, 0.30))
-			var label_color := PHASE_ORANGE if is_active else PHASE_CYAN if is_done else Color(1.0, 1.0, 1.0, 0.35)
+			var label_color := NEON_YELLOW if is_active else NEON_ORANGE_DIM if is_done else Color(1.0, 1.0, 1.0, 0.35)
 			draw_string(font, Vector2(seg_rect.position.x, bar_pos.y - 8.0), PHASE_LABELS[i], HORIZONTAL_ALIGNMENT_CENTER, seg_w, 10, label_color)
 		if phase_time_text != "":
-			var text_color := PHASE_RED if low_time else PHASE_ORANGE
+			var text_color := NEON_MAGENTA if low_time else NEON_YELLOW
 			if low_time:
 				text_color.a = 0.65 + 0.35 * sin(_pulse * 9.0)
 			draw_string(font, Vector2(bar_rect.end.x + 10.0, bar_rect.get_center().y + 5.0), phase_time_text, HORIZONTAL_ALIGNMENT_LEFT, 64.0, 15, text_color)
@@ -253,6 +255,33 @@ class WindHud extends Control:
 		draw_line(end, end - dir.rotated(head_angle) * head_size, color, 2.0)
 		draw_line(end, end - dir.rotated(-head_angle) * head_size, color, 2.0)
 
+
+class DistAngleHud extends Control:
+	var distance := 0.0
+	var angle := 0.0
+	const CYAN_DIM := Color(0.55, 0.7, 0.85, 0.65)
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func set_values(dist: float, ang: float) -> void:
+		distance = dist
+		angle = ang
+		queue_redraw()
+
+	func _draw() -> void:
+		var font := get_theme_default_font()
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color(0.0, 0.01, 0.03, 0.55)
+		style.border_color = Color(0.0, 0.85, 1.0, 0.45)
+		style.set_border_width_all(1)
+		style.set_corner_radius_all(8)
+		draw_style_box(style, Rect2(Vector2.ZERO, size))
+		draw_string(font, Vector2(12.0, 26.0), "DIST", HORIZONTAL_ALIGNMENT_LEFT, 50.0, 11, CYAN_DIM)
+		draw_string(font, Vector2(60.0, 28.0), "%.1f m" % distance, HORIZONTAL_ALIGNMENT_LEFT, 90.0, 18, Color(0.25, 0.85, 1.0, 0.95))
+		draw_string(font, Vector2(12.0, 54.0), "ANGLE", HORIZONTAL_ALIGNMENT_LEFT, 50.0, 11, CYAN_DIM)
+		draw_string(font, Vector2(60.0, 56.0), "%d°" % roundi(angle), HORIZONTAL_ALIGNMENT_LEFT, 90.0, 18, Color(0.25, 0.85, 1.0, 0.95))
+
 @onready var power_label: Label = %PowerLabel
 @onready var power_bar: ProgressBar = %PowerBar
 @onready var power_meter: Control = %PowerMeterPanel
@@ -287,6 +316,7 @@ var goal_banner_color := Color(0.0, 0.95, 1.0)
 var goal_banner_progress := 0.0
 var goal_banner_alpha := 1.0
 var wind_module: Control
+var dist_angle_module: Control
 
 func _ready() -> void:
 	ui_root = get_node_or_null("Root") as Control
@@ -302,6 +332,7 @@ func _ready() -> void:
 	support_marker_hint = _create_support_marker_hint()
 	goal_banner = _create_goal_banner()
 	wind_module = _create_wind_module()
+	dist_angle_module = _create_dist_angle_module()
 	_apply_mvp_layout()
 	_center_score_hud()
 	restart_button.pressed.connect(func() -> void: restart_requested.emit())
@@ -453,11 +484,13 @@ func set_run_hud(level: int, goals: int, attempts: int, misses: int, max_misses:
 	if score_hud != null and score_hud.has_method("set_stats"):
 		score_hud.call("set_stats", level, goals, attempts, misses, max_misses, message)
 
-func set_environment_info(distance: float, wind: Vector3) -> void:
+func set_environment_info(distance: float, wind: Vector3, angle: float = 0.0) -> void:
 	if score_hud != null and score_hud.has_method("set_distance"):
 		score_hud.call("set_distance", distance)
 	if wind_module != null and wind_module.has_method("set_wind"):
 		wind_module.call("set_wind", wind)
+	if dist_angle_module != null and dist_angle_module.has_method("set_values"):
+		dist_angle_module.call("set_values", distance, angle)
 
 func _create_support_zone_overlay() -> Control:
 	var root := get_node_or_null("Root") as Control
@@ -554,8 +587,21 @@ func _create_wind_module() -> Control:
 	var hud := WindHud.new()
 	hud.name = "WindHud"
 	hud.size = Vector2(156.0, 78.0)
-	hud.set_anchors_preset(Control.PRESET_CENTER_LEFT)
-	hud.position = Vector2(22.0, -46.0)
+	hud.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	hud.position = Vector2(22.0, -24.0)
+	if root != null:
+		root.add_child(hud)
+	else:
+		add_child(hud)
+	return hud
+
+func _create_dist_angle_module() -> Control:
+	var root := get_node_or_null("Root") as Control
+	var hud := DistAngleHud.new()
+	hud.name = "DistAngleHud"
+	hud.size = Vector2(148.0, 68.0)
+	hud.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	hud.position = Vector2(-172.0, -24.0)
 	if root != null:
 		root.add_child(hud)
 	else:

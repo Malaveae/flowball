@@ -10,7 +10,7 @@ extends Node
 @export var ball_radius: float = 0.11
 @export var drag_coefficient: float = 0.25
 @export var drag_multiplier: float = 1.0
-@export var magnus_multiplier: float = 0.45
+@export var magnus_multiplier: float = 0.65
 @export var spin_decay_per_second: float = 0.35
 @export var wind_multiplier: float = 1.0
 

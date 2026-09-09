@@ -20,7 +20,6 @@ func _on_body_entered(body: Node3D) -> void:
 	if body is FreeKickBall3D:
 		_capture_ball_in_net(body)
 		goal_scored.emit()
-		print("GOAL")
 
 func _capture_ball_in_net(ball: FreeKickBall3D) -> void:
 	var velocity := ball.linear_velocity * net_capture_velocity_scale

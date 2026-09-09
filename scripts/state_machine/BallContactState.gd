@@ -35,7 +35,8 @@ func _process(delta: float) -> void:
 	controller.ui.set_status("CONTACT - point and drag - %.1fs" % remaining)
 	if touching:
 		swipe_duration += delta
-	elif elapsed >= time_limit:
+	# Timer always checks, even while the follow-through trace is active.
+	if elapsed >= time_limit:
 		_commit(true)
 
 func _input(event: InputEvent) -> void:

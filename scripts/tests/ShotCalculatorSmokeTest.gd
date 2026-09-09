@@ -173,7 +173,7 @@ func _test_support_aim_target_adjusts_aim() -> bool:
 	right_angle_input.support_aim_target = 1.0
 	var left_angle := ShotCalculator.calculate(left_angle_input, _stats(), _environment(), _difficulty())
 	var right_angle := ShotCalculator.calculate(right_angle_input, _stats(), _environment(), _difficulty())
-	var passed := right_angle.horizontal_angle < left_angle.horizontal_angle
+	var passed := right_angle.horizontal_angle > left_angle.horizontal_angle
 	_print_result("support aim target adjusts aim", passed)
 	return passed
 
@@ -211,12 +211,18 @@ func _test_plant_distance_optimal_keeps_full_lane() -> bool:
 func _test_support_aim_target_reaches_goal_side() -> bool:
 	var left_input := _base_input(0.75)
 	left_input.support_aim_target = -1.0
+	left_input.support_vector = Vector2(-0.28, 0.0)  # optimal plant band for full angle scale
 	var right_input := _base_input(0.75)
 	right_input.support_aim_target = 1.0
+	right_input.support_vector = Vector2(-0.28, 0.0)  # optimal plant band for full angle scale
 	var left := ShotCalculator.calculate(left_input, _stats(), _environment(), _difficulty())
 	var right := ShotCalculator.calculate(right_input, _stats(), _environment(), _difficulty())
+	print("DEBUG: left_angle=", left.horizontal_angle, " right_angle=", right.horizontal_angle)
+	print("DEBUG: left_vel.x=", left.launch_velocity.x, " right_vel.x=", right.launch_velocity.x)
 	var left_x := _x_at_goal_plane(left.launch_velocity, 24.0)
 	var right_x := _x_at_goal_plane(right.launch_velocity, 24.0)
+	print("DEBUG: left_x=", left_x, " right_x=", right_x)
+	# aim_target=-1 curves left (negative x), aim_target=1 curves right (positive x)
 	var passed := right_x > left_x and right_x > 0.0 and left_x < 0.0
 	_print_result("support aim target reaches goal side", passed)
 	return passed

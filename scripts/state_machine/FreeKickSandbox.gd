@@ -89,7 +89,7 @@ func _start_attempt(selected_foot: String) -> void:
 	var wind_strength := randf_range(0.5, 7.0)
 	controller.environment.wind_vector = Vector3(cos(wind_angle) * wind_strength, 0.0, sin(wind_angle) * wind_strength)
 	if controller.ui != null:
-		controller.ui.set_environment_info(controller.environment.distance_to_goal, controller.environment.wind_vector)
+		controller.ui.set_environment_info(controller.environment.distance_to_goal, controller.environment.wind_vector, controller.environment.angle_to_goal)
 	if goalkeeper != null:
 		goalkeeper.call("reset_for_free_kick")
 		goalkeeper.call("set_ready")

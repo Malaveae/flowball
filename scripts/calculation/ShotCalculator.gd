@@ -6,7 +6,7 @@ const MAX_LAUNCH_SPEED := 36.0
 const MIN_ELEVATION_DEG := -3.0
 const MAX_ELEVATION_DEG := 35.0
 const MAX_SPIN_RATE := 140.0
-const MAX_HORIZONTAL_OFFSET_DEG := 25.0
+const MAX_HORIZONTAL_OFFSET_DEG := 35.0
 const IDEAL_POWER_MAX := 0.85
 
 # Step 1 power curve (sigmoid). The ideal window width follows control stats;
@@ -134,7 +134,8 @@ static func _launch_velocity(base_direction: Vector3, horizontal_deg: float, ele
 	var flat_dir := base_direction.slide(Vector3.UP).normalized()
 	if flat_dir == Vector3.ZERO:
 		flat_dir = Vector3.FORWARD
-	flat_dir = flat_dir.rotated(Vector3.UP, deg_to_rad(horizontal_deg)).normalized()
+	# Negate angle so positive = curve toward +X (right), negative = curve toward -X (left).
+	flat_dir = flat_dir.rotated(Vector3.UP, deg_to_rad(-horizontal_deg)).normalized()
 	var horizontal_speed := speed * cos(deg_to_rad(elevation_deg))
 	var vertical_speed := speed * sin(deg_to_rad(elevation_deg))
 	return flat_dir * horizontal_speed + Vector3.UP * vertical_speed
@@ -173,12 +174,9 @@ static func support_angle_scale(support_vector: Vector2) -> float:
 static func _support_aim_target_offset(target: float) -> float:
 	# Step 2 substep B: the foot points at a target lane, independent of support-foot side.
 	# Input convention: -1 = left post, 0 = center, +1 = right post.
-	# Keep this close to real free-kick geometry: from ~24m, aiming from center to a post
-	# is roughly 9 degrees, so full stick should bias toward a post, not far outside it.
-	# Godot uses -Z as the forward goal direction in this scene. Rotating Vector3(0,0,-1)
-	# around +Y by a positive angle moves it toward world-left (negative X), so gameplay
-	# right must be converted to a negative Y-rotation angle.
-	return -clampf(target, -1.0, 1.0) * 11.0
+	# Full aim range maps to MAX_HORIZONTAL_OFFSET_DEG so the player can aim
+	# OUTSIDE the post and let the curl bring the ball back (wide-to-post curl shots).
+	return clampf(target, -1.0, 1.0) * MAX_HORIZONTAL_OFFSET_DEG
 
 static func _curve_bias_from_support(support_x: float, selected_foot: String) -> float:
 	var foot_sign := -1.0 if selected_foot == "right" else 1.0
@@ -206,7 +204,7 @@ static func _spin_axis_from_contact_and_swipe(contact: Vector2, swipe: Vector2, 
 	# - swipe/contact to screen-right = visible right curl
 	# Foot only slightly biases natural inside-foot curl; it must not invert what the player sees.
 	var side_action := absf(contact.x) + absf(swipe.x)
-	var natural_foot_bias := (-0.12 if selected_foot == "right" else 0.12) * clampf(side_action * 2.0, 0.0, 1.0)
+	var natural_foot_bias := (0.12 if selected_foot == "right" else -0.12) * clampf(side_action * 2.0, 0.0, 1.0)
 	var raw_side_spin := contact.x * 1.65 + swipe.x * 2.35 + natural_foot_bias
 	# Magnus force uses omega x velocity. With goal direction near -Z, positive omega.y
 	# bends the ball toward world-left. Hitting/swiping the visible right half of the ball

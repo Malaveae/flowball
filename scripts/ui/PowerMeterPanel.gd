@@ -40,17 +40,7 @@ func _draw() -> void:
 		bar_x = 12.0 + boot_size.x + 16.0
 	bar_rect.position = Vector2(bar_x, 12.0)
 
-	var shell := StyleBoxFlat.new()
-	shell.bg_color = Color(0.0, 0.0, 0.0, 0.34)
-	shell.border_color = Color(1.0, 1.0, 1.0, 0.16)
-	shell.border_width_left = 1
-	shell.border_width_top = 1
-	shell.border_width_right = 1
-	shell.border_width_bottom = 1
-	shell.corner_radius_top_left = 14
-	shell.corner_radius_top_right = 14
-	shell.corner_radius_bottom_left = 14
-	shell.corner_radius_bottom_right = 14
+	var shell := HudTheme.panel_style(Color(0.0, 0.0, 0.0, 0.34), Color(1.0, 1.0, 1.0, 0.16), 1, 14)
 	draw_style_box(shell, bar_rect.grow(6.0))
 
 	var inner := bar_rect.grow(-4.0)
@@ -79,17 +69,16 @@ func _draw() -> void:
 	for frac: float in [OPTIMAL_MIN, OPTIMAL_MAX]:
 		var notch_y := inner.end.y - inner.size.y * frac
 		draw_line(Vector2(inner.position.x - 5.0, notch_y), Vector2(inner.position.x + bar_width + 5.0, notch_y), notch_color, 1.6)
-	_draw_zone_label(inner, 0.20, "LOW", Color(0.0, 0.75, 1.0, 0.9), font, labels_on_left)
-	_draw_zone_label(inner, 0.55, "CONTROL", Color(0.55, 1.0, 0.25, 0.9), font, labels_on_left)
-	_draw_zone_label(inner, 0.775, "IDEAL", Color(1.0, 0.92, 0.0, 0.95), font, labels_on_left)
-	_draw_zone_label(inner, 0.925, "RISK", Color(1.0, 0.22, 0.08, 0.95), font, labels_on_left)
+	_draw_zone_label(inner, 0.20, "LOW", Color(HudTheme.CYAN_VALUE, 0.9), font, labels_on_left)
+	_draw_zone_label(inner, 0.55, "CONTROL", HudTheme.GREEN_SOFT, font, labels_on_left)
+	_draw_zone_label(inner, 0.775, "IDEAL", Color(HudTheme.YELLOW, 0.95), font, labels_on_left)
+	_draw_zone_label(inner, 0.925, "RISK", Color(HudTheme.RED_RISK, 0.95), font, labels_on_left)
+	# Numeric scale at the major ticks (mockup: 0/25/50/75/100 hugging the bar).
+	_draw_numeric_scale(inner, labels_on_left, font)
 
 	var pointer_y := inner.end.y - inner.size.y * power_value
 	var pointer_color := _power_color(power_value, 1.0)
-	draw_line(Vector2(inner.position.x - 9.0, pointer_y), Vector2(inner.end.x + 9.0, pointer_y), Color(1, 1, 1, 0.58), 2.0)
-	draw_circle(Vector2(inner.get_center().x, pointer_y), maxf(5.0, bar_width * 0.2), pointer_color)
-
-	# The boot travels the FULL panel bottom-to-top as power goes 0% -> 100%:
+	# Boot travels the FULL panel bottom-to-top as power goes 0% -> 100%:
 	# at 0% it sits at the base, at 100% it reaches the top, moving throughout the
 	# whole travel instead of clamping partway.
 	var boot_bottom_y := size.y - boot_rect.size.y - 8.0
@@ -101,28 +90,31 @@ func _draw() -> void:
 	else:
 		boot_rect.position = Vector2(12.0, boot_y)
 	_draw_kicking_boot(boot_rect)
-	_draw_power_value_label(boot_rect, pointer_y, pointer_color)
+	# Value badge ON the bar at pointer height (mockup pill), drawn last so it
+	# floats over boot/labels without collision.
+	_draw_power_pill(inner, pointer_y, pointer_color)
 	draw_string(font, Vector2(0.0, size.y - 2.0), "%s FOOT  -  POWER" % kicking_foot.to_upper(), HORIZONTAL_ALIGNMENT_CENTER, size.x, maxf(12.0, size.y * 0.05), Color(1, 1, 1, 0.48))
 
-func _draw_power_value_label(boot_rect: Rect2, pointer_y: float, color: Color) -> void:
+## Numeric scale at 0/25/50/75/100, on the labels side of the bar but hugging it.
+func _draw_numeric_scale(inner: Rect2, labels_on_left: bool, font: Font) -> void:
+	for t: float in [0.0, 0.25, 0.5, 0.75, 1.0]:
+		var y := inner.end.y - inner.size.y * t + 4.0
+		var text := str(roundi(t * 100.0))
+		if labels_on_left:
+			draw_string(font, Vector2(inner.position.x - 30.0, y), text, HORIZONTAL_ALIGNMENT_RIGHT, 24.0, 10, Color(1.0, 1.0, 1.0, 0.45))
+		else:
+			draw_string(font, Vector2(inner.end.x + 6.0, y), text, HORIZONTAL_ALIGNMENT_LEFT, 24.0, 10, Color(1.0, 1.0, 1.0, 0.45))
+
+## Percent badge floating on the bar, centered at the pointer height.
+func _draw_power_pill(inner: Rect2, pointer_y: float, color: Color) -> void:
 	var font := get_theme_default_font()
-	var label_size := Vector2(maxf(56.0, boot_rect.size.x * 0.9), 28.0)
-	var x := boot_rect.position.x - label_size.x - 6.0 if kicking_foot == "right" else boot_rect.end.x + 6.0
-	var y := clampf(pointer_y - label_size.y * 0.5, 8.0, size.y - label_size.y - 8.0)
-	var rect := Rect2(Vector2(x, y), label_size)
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.0, 0.0, 0.0, 0.42)
-	bg.border_color = color
-	bg.border_width_left = 1
-	bg.border_width_top = 1
-	bg.border_width_right = 1
-	bg.border_width_bottom = 1
-	bg.corner_radius_top_left = 8
-	bg.corner_radius_top_right = 8
-	bg.corner_radius_bottom_left = 8
-	bg.corner_radius_bottom_right = 8
-	draw_style_box(bg, rect)
-	draw_string(font, rect.position + Vector2(0.0, 20.0), "%d%%" % roundi(power_value * 100.0), HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 18, Color(1.0, 1.0, 1.0, 0.92))
+	# Pointer line across the bar (mockup), under the badge.
+	draw_line(Vector2(inner.position.x - 9.0, pointer_y), Vector2(inner.end.x + 9.0, pointer_y), Color(1, 1, 1, 0.58), 2.0)
+	var pill_size := Vector2(46.0, 24.0)
+	var pill_pos := Vector2(inner.get_center().x - pill_size.x * 0.5, clampf(pointer_y - pill_size.y * 0.5, 6.0, size.y - pill_size.y - 30.0))
+	var rect := Rect2(pill_pos, pill_size)
+	draw_style_box(HudTheme.pill_style(color), rect)
+	draw_string(font, rect.position + Vector2(0.0, 17.0), "%d%%" % roundi(power_value * 100.0), HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 14, Color(1.0, 1.0, 1.0, 0.95))
 
 func _draw_kicking_boot(rect: Rect2) -> void:
 	var center := rect.get_center()
@@ -159,10 +151,4 @@ func _draw_zone_label(rect: Rect2, t: float, label: String, color: Color, font: 
 		draw_string(font, Vector2(text_x, y), label, HORIZONTAL_ALIGNMENT_LEFT, 96.0, 12, color)
 
 func _power_color(value: float, alpha: float) -> Color:
-	if value < 0.40:
-		return Color(0.0, 0.75, 1.0, alpha)
-	if value < 0.70:
-		return Color(0.3, 1.0, 0.2, alpha)
-	if value < 0.85:
-		return Color(0.9, 1.0, 0.0, alpha)
-	return Color(1.0, 0.18, 0.08, alpha)
+	return HudTheme.power_zone_color(value, alpha)

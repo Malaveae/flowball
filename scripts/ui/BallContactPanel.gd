@@ -3,10 +3,10 @@ extends Panel
 
 @export var ball_radius_px: float = 180.0
 @export var ball_color: Color = Color(1.0, 1.0, 1.0, 0.16)
-@export var guide_color: Color = Color(0.2, 0.85, 1.0, 0.85)
-@export var lift_color: Color = Color(0.35, 1.0, 0.45, 0.8)
-@export var drive_color: Color = Color(1.0, 0.35, 0.2, 0.8)
-@export var swipe_color: Color = Color(1.0, 0.9, 0.25, 0.9)
+@export var guide_color: Color = HudTheme.CYAN_VALUE
+@export var lift_color: Color = HudTheme.GREEN_SUCCESS
+@export var drive_color: Color = HudTheme.RED_RISK
+@export var swipe_color: Color = HudTheme.YELLOW_WARN
 
 var raw_points: PackedVector2Array = PackedVector2Array()
 

@@ -3,6 +3,11 @@ extends CanvasLayer
 
 const LEFT_SUPPORT_BOOT_TEXTURE := preload("res://assets/PumaAttacantoIZQ.png")
 
+const WIND_HUD_SIZE := Vector2(156.0, 78.0)
+const WIND_HUD_MARGIN := Vector2(24.0, 24.0)
+const DIST_HUD_SIZE := Vector2(148.0, 68.0)
+const DIST_HUD_MARGIN := Vector2(24.0, 24.0)
+
 signal restart_requested
 signal switch_foot_requested
 signal next_spot_requested
@@ -40,18 +45,18 @@ class ModernScoreHud:
 	var phase_time_text := ""
 	var _pulse := 0.0
 	const PHASE_LABELS := ["[1] POWER", "[2] PLANT", "[3] KICK"]
-	const PHASE_CYAN := Color(0.0, 0.86, 1.0)
-	const PHASE_ORANGE := Color(1.0, 0.62, 0.18)
-	const PHASE_RED := Color(1.0, 0.25, 0.20)
-	# Retro Arcade palette
-	const NEON_CYAN := Color(0.0, 1.0, 1.0)
-	const NEON_MAGENTA := Color(1.0, 0.0, 1.0)
-	const NEON_YELLOW := Color(1.0, 1.0, 0.0)
-	const NEON_ORANGE := Color(1.0, 0.56, 0.0)
-	const NEON_ORANGE_DIM := Color(1.0, 0.56, 0.0, 0.55)
-	const NEON_ORANGE_BRIGHT := Color(1.0, 0.68, 0.18)
+	# Palette lives in HudTheme (docs/hud-revamp-plan.md, Phase A); these aliases
+	# keep the draw code readable while the palette stays centralized.
+	const PHASE_CYAN := HudTheme.CYAN_BRIGHT
+	const PHASE_ORANGE := HudTheme.ORANGE_BRIGHT
+	const PHASE_RED := HudTheme.RED_RISK
+	const NEON_CYAN := HudTheme.CYAN_BRIGHT
+	const NEON_MAGENTA := HudTheme.MAGENTA_ALERT
+	const NEON_YELLOW := HudTheme.YELLOW
+	const NEON_ORANGE := HudTheme.ORANGE
+	const NEON_ORANGE_DIM := HudTheme.ORANGE_DIM
+	const NEON_ORANGE_BRIGHT := HudTheme.ORANGE_BRIGHT
 	var distance_to_goal: float = 24.0
-	var angle_to_goal: float = 0.0
 
 	func _ready() -> void:
 		process_mode = Node.PROCESS_MODE_ALWAYS
@@ -59,6 +64,11 @@ class ModernScoreHud:
 
 	func _process(delta: float) -> void:
 		_pulse += delta
+		# Subtle breathing on the NinePatch chrome keeps the HUD alive like the
+		# old drawn glow did (asset-baked neon is static otherwise).
+		var frame := get_parent() as NinePatchRect
+		if frame != null:
+			frame.modulate.a = 0.94 + 0.06 * sin(_pulse * 2.4)
 		queue_redraw()
 
 	func set_stats(next_level: int, next_goals: int, next_attempts: int, next_misses: int, next_max_misses: int, next_message: String = "") -> void:
@@ -89,17 +99,10 @@ class ModernScoreHud:
 		distance_to_goal = distance
 		queue_redraw()
 
-	func set_angle(angle: float) -> void:
-		angle_to_goal = angle
-		queue_redraw()
-
 
 	func _draw() -> void:
 		var rect := Rect2(Vector2.ZERO, size)
 		var font := get_theme_default_font()
-		var glow := 0.55 + sin(_pulse * 2.4) * 0.16
-		_draw_stadium_glass(rect, glow)
-
 		var left_rect := Rect2(Vector2(46.0, 29.0), Vector2(238.0, 104.0))
 		var center_rect := Rect2(Vector2(330.0, 29.0), Vector2(340.0, 104.0))
 		var right_rect := Rect2(Vector2(728.0, 29.0), Vector2(248.0, 104.0))
@@ -112,21 +115,6 @@ class ModernScoreHud:
 		_draw_misses(font, right_rect)
 
 		_draw_phase_bar(font)
-
-	func _draw_stadium_glass(rect: Rect2, glow: float) -> void:
-		var poly := PackedVector2Array([
-			Vector2(34.0, 0.0), Vector2(size.x - 34.0, 0.0), Vector2(size.x - 8.0, 8.0),
-			Vector2(size.x, 28.0), Vector2(size.x, 122.0), Vector2(size.x - 16.0, 146.0),
-			Vector2(size.x - 56.0, 162.0), Vector2(size.x - 312.0, 162.0), Vector2(size.x - 340.0, 180.0),
-			Vector2(340.0, 180.0), Vector2(312.0, 162.0), Vector2(56.0, 162.0),
-			Vector2(16.0, 146.0), Vector2(0.0, 122.0), Vector2(0.0, 28.0), Vector2(8.0, 8.0)
-		])
-		draw_colored_polygon(poly, Color(0.0, 0.008, 0.018, 0.78))
-		draw_polyline(poly + PackedVector2Array([poly[0]]), Color(0.08, 0.82, 1.0, glow), 2.4, true)
-		draw_polyline(PackedVector2Array([Vector2(28.0, 4.0), Vector2(174.0, 4.0), Vector2(188.0, 10.0)]), Color(0.0, 0.95, 1.0, 0.95), 3.0, true)
-		draw_polyline(PackedVector2Array([Vector2(size.x - 188.0, 10.0), Vector2(size.x - 174.0, 4.0), Vector2(size.x - 28.0, 4.0)]), Color(0.0, 0.95, 1.0, 0.95), 3.0, true)
-		draw_rect(Rect2(Vector2(56.0, 14.0), Vector2(size.x - 112.0, 1.0)), Color(0.55, 0.95, 1.0, 0.18), true)
-		draw_rect(Rect2(Vector2(70.0, 132.0), Vector2(size.x - 140.0, 1.0)), Color(1.0, 1.0, 1.0, 0.10), true)
 
 	func _draw_divider(a: Vector2, b: Vector2) -> void:
 		draw_line(a, b, Color(1.0, 1.0, 1.0, 0.18), 1.8)
@@ -180,38 +168,46 @@ class ModernScoreHud:
 		draw_style_box(fill, fill_rect)
 
 	func _draw_phase_bar(font: Font) -> void:
+		# Mockup style: three separate segmented boxes under the phase labels,
+		# with the live countdown pill anchored inside the ACTIVE box.
 		var bar_size := Vector2(480.0, 18.0)
 		# Horizontally centered within the HUD's own width.
 		var bar_pos := Vector2((size.x - bar_size.x) * 0.5, 150.0)
-		var gap := 4.0
+		var gap := 8.0
 		var seg_w := (bar_size.x - gap * 2.0) / 3.0
-		var bar_rect := Rect2(bar_pos, bar_size)
-		draw_rect(bar_rect, Color(0.02, 0.03, 0.06, 0.55), true)
-		draw_rect(bar_rect, Color(1.0, 1.0, 1.0, 0.16), false, 1.0)
 		var low_time := active_step >= 2 and phase_time_text != "" and phase_fill < 0.30
 		for i in range(3):
 			var step := i + 1
 			var is_done := active_step > step
 			var is_active := active_step == step
-			var seg_rect := Rect2(bar_pos + Vector2(float(i) * (seg_w + gap), 1.0), Vector2(seg_w, bar_size.y - 2.0))
+			var seg_rect := Rect2(bar_pos + Vector2(float(i) * (seg_w + gap), 0.0), Vector2(seg_w, bar_size.y))
+			# Box shell: dark glass + border that brightens for the active step.
+			draw_rect(seg_rect, Color(0.02, 0.03, 0.06, 0.55), true)
+			draw_rect(seg_rect, HudTheme.CYAN_BRIGHT if is_active else Color(1.0, 1.0, 1.0, 0.18), false, 1.2 if is_active else 1.0)
 			var fill := 1.0 if is_done else phase_fill if is_active else 0.0
 			if fill > 0.01:
 				var fill_color := PHASE_CYAN if is_done else NEON_MAGENTA if is_active and low_time else NEON_YELLOW
-				var fill_rect := Rect2(seg_rect.position, Vector2(seg_rect.size.x * clampf(fill, 0.0, 1.0), seg_rect.size.y))
+				var fill_rect := Rect2(seg_rect.position + Vector2(2.0, 2.0), Vector2(maxf(0.0, (seg_rect.size.x - 4.0) * clampf(fill, 0.0, 1.0)), seg_rect.size.y - 4.0))
+				draw_rect(fill_rect, HudTheme.glow_variant(fill_color, 0.22), true)
 				draw_rect(fill_rect, fill_color, true)
 				if is_active and step >= 2 and fill < 0.995:
 					var cursor_x := fill_rect.end.x
-					draw_line(Vector2(cursor_x, seg_rect.position.y - 1.0), Vector2(cursor_x, seg_rect.end.y + 1.0), Color(0.0, 0.95, 1.0, 0.95), 2.0)
-			if i < 2:
-				var chevron_center := Vector2(seg_rect.end.x + gap * 0.5, bar_rect.get_center().y)
-				draw_colored_polygon(PackedVector2Array([chevron_center + Vector2(-3.0, -4.0), chevron_center + Vector2(3.0, 0.0), chevron_center + Vector2(-3.0, 4.0)]), Color(1.0, 1.0, 1.0, 0.30))
+					draw_line(Vector2(cursor_x, seg_rect.position.y + 1.0), Vector2(cursor_x, seg_rect.end.y - 1.0), HudTheme.CYAN_BRIGHT, 2.0)
 			var label_color := NEON_YELLOW if is_active else NEON_ORANGE_DIM if is_done else Color(1.0, 1.0, 1.0, 0.35)
 			draw_string(font, Vector2(seg_rect.position.x, bar_pos.y - 8.0), PHASE_LABELS[i], HORIZONTAL_ALIGNMENT_CENTER, seg_w, 10, label_color)
-		if phase_time_text != "":
+		# Countdown/percent pill anchored to the right edge of the ACTIVE box:
+		# the fill grows left-to-right, so the pill is covered last and stays legible.
+		var active_index := active_step - 1
+		if phase_time_text != "" and active_index >= 0 and active_index < 3:
+			var box := Rect2(bar_pos + Vector2(float(active_index) * (seg_w + gap), 0.0), Vector2(seg_w, bar_size.y))
 			var text_color := NEON_MAGENTA if low_time else NEON_YELLOW
 			if low_time:
 				text_color.a = 0.65 + 0.35 * sin(_pulse * 9.0)
-			draw_string(font, Vector2(bar_rect.end.x + 10.0, bar_rect.get_center().y + 5.0), phase_time_text, HORIZONTAL_ALIGNMENT_LEFT, 64.0, 15, text_color)
+			var pill_w := 52.0
+			var pill := Rect2(box.end - Vector2(pill_w + 2.0, bar_size.y + 2.0), Vector2(pill_w, bar_size.y + 4.0))
+			draw_rect(pill, Color(0.0, 0.02, 0.04, 0.72), true)
+			draw_rect(pill, Color(text_color, 0.55), false, 1.0)
+			draw_string(font, pill.position + Vector2(0.0, pill.size.y * 0.5 + 4.0), phase_time_text, HORIZONTAL_ALIGNMENT_CENTER, pill.size.x, 12, text_color)
 
 class WindHud extends Control:
 	var wind_speed := 0.0
@@ -231,24 +227,19 @@ class WindHud extends Control:
 	func _draw() -> void:
 		var font := get_theme_default_font()
 		var rect := Rect2(Vector2.ZERO, size)
-		var style := StyleBoxFlat.new()
-		style.bg_color = Color(0.0, 0.01, 0.03, 0.55)
-		style.border_color = Color(0.0, 0.85, 1.0, 0.45)
-		style.set_border_width_all(1)
-		style.set_corner_radius_all(8)
-		draw_style_box(style, rect)
-		draw_string(font, Vector2(12.0, 18.0), "WIND", HORIZONTAL_ALIGNMENT_LEFT, 60.0, 10, Color(0.55, 0.7, 0.85, 0.65))
+		draw_style_box(HudTheme.small_frame_style(), rect)
+		draw_string(font, Vector2(12.0, 18.0), "WIND", HORIZONTAL_ALIGNMENT_LEFT, 60.0, 10, HudTheme.TEXT_LABEL)
 		if wind_speed < 0.3:
-			draw_string(font, Vector2(12.0, 50.0), "calm", HORIZONTAL_ALIGNMENT_LEFT, 60.0, 16, Color(0.55, 0.9, 0.6, 0.9))
+			draw_string(font, Vector2(12.0, 50.0), "calm", HORIZONTAL_ALIGNMENT_LEFT, 60.0, 16, HudTheme.GREEN_SUCCESS)
 		else:
 			_draw_wind_arrow(Vector2(30.0, 46.0), wind_direction_deg, 14.0)
-			draw_string(font, Vector2(48.0, 51.0), "%.1f m/s" % wind_speed, HORIZONTAL_ALIGNMENT_LEFT, 100.0, 16, Color(0.25, 0.85, 1.0, 0.95))
+			draw_string(font, Vector2(48.0, 51.0), "%.1f m/s" % wind_speed, HORIZONTAL_ALIGNMENT_LEFT, 100.0, 16, HudTheme.CYAN_VALUE)
 
 	func _draw_wind_arrow(origin: Vector2, direction_deg: float, length: float) -> void:
 		var angle := deg_to_rad(direction_deg)
 		var dir := Vector2(sin(angle), -cos(angle))
 		var end := origin + dir * length
-		var color := Color(0.25, 0.85, 1.0, 0.9)
+		var color := HudTheme.CYAN_VALUE
 		draw_line(origin, end, color, 2.0)
 		var head_size := 5.0
 		var head_angle := deg_to_rad(140.0)
@@ -259,7 +250,6 @@ class WindHud extends Control:
 class DistAngleHud extends Control:
 	var distance := 0.0
 	var angle := 0.0
-	const CYAN_DIM := Color(0.55, 0.7, 0.85, 0.65)
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -271,16 +261,11 @@ class DistAngleHud extends Control:
 
 	func _draw() -> void:
 		var font := get_theme_default_font()
-		var style := StyleBoxFlat.new()
-		style.bg_color = Color(0.0, 0.01, 0.03, 0.55)
-		style.border_color = Color(0.0, 0.85, 1.0, 0.45)
-		style.set_border_width_all(1)
-		style.set_corner_radius_all(8)
-		draw_style_box(style, Rect2(Vector2.ZERO, size))
-		draw_string(font, Vector2(12.0, 26.0), "DIST", HORIZONTAL_ALIGNMENT_LEFT, 50.0, 11, CYAN_DIM)
-		draw_string(font, Vector2(60.0, 28.0), "%.1f m" % distance, HORIZONTAL_ALIGNMENT_LEFT, 90.0, 18, Color(0.25, 0.85, 1.0, 0.95))
-		draw_string(font, Vector2(12.0, 54.0), "ANGLE", HORIZONTAL_ALIGNMENT_LEFT, 50.0, 11, CYAN_DIM)
-		draw_string(font, Vector2(60.0, 56.0), "%d°" % roundi(angle), HORIZONTAL_ALIGNMENT_LEFT, 90.0, 18, Color(0.25, 0.85, 1.0, 0.95))
+		draw_style_box(HudTheme.small_frame_style(), Rect2(Vector2.ZERO, size))
+		draw_string(font, Vector2(12.0, 26.0), "DIST", HORIZONTAL_ALIGNMENT_LEFT, 50.0, 11, HudTheme.TEXT_LABEL)
+		draw_string(font, Vector2(60.0, 28.0), "%.1f m" % distance, HORIZONTAL_ALIGNMENT_LEFT, 90.0, 18, HudTheme.CYAN_VALUE)
+		draw_string(font, Vector2(12.0, 54.0), "ANGLE", HORIZONTAL_ALIGNMENT_LEFT, 50.0, 11, HudTheme.TEXT_LABEL)
+		draw_string(font, Vector2(60.0, 56.0), "%d°" % roundi(angle), HORIZONTAL_ALIGNMENT_LEFT, 90.0, 18, HudTheme.CYAN_VALUE)
 
 @onready var power_label: Label = %PowerLabel
 @onready var power_bar: ProgressBar = %PowerBar
@@ -365,6 +350,7 @@ func _update_uiroot_margins() -> void:
 		result_card.offset_top = 190.0 * s
 		result_card.offset_bottom = (190.0 + 130.0) * s
 		result_card.size = Vector2(420.0 * s, 130.0 * s)
+	_layout_corner_modules()
 
 ## Positions `control` inside ui_root at a normalized anchor point (0..1) with an edge margin.
 ## Sizes scale with the widget scale; margins stay in viewport px (stretch already scales them).
@@ -390,6 +376,10 @@ func _place_anchored(control: Control, anchor_point: Vector2, margin: Vector2, s
 	else:
 		control.offset_top = -margin.y - s.y
 		control.offset_bottom = -margin.y
+
+func _layout_corner_modules() -> void:
+	_place_anchored(wind_module, Vector2(0.0, 1.0), WIND_HUD_MARGIN, WIND_HUD_SIZE)
+	_place_anchored(dist_angle_module, Vector2(1.0, 1.0), DIST_HUD_MARGIN, DIST_HUD_SIZE)
 
 func _create_impact_pulse() -> Control:
 	var pulse := Control.new()
@@ -586,9 +576,6 @@ func _create_wind_module() -> Control:
 	var root := get_node_or_null("Root") as Control
 	var hud := WindHud.new()
 	hud.name = "WindHud"
-	hud.size = Vector2(156.0, 78.0)
-	hud.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	hud.position = Vector2(22.0, -24.0)
 	if root != null:
 		root.add_child(hud)
 	else:
@@ -599,9 +586,6 @@ func _create_dist_angle_module() -> Control:
 	var root := get_node_or_null("Root") as Control
 	var hud := DistAngleHud.new()
 	hud.name = "DistAngleHud"
-	hud.size = Vector2(148.0, 68.0)
-	hud.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	hud.position = Vector2(-172.0, -24.0)
 	if root != null:
 		root.add_child(hud)
 	else:
@@ -713,12 +697,9 @@ func _draw_result_card() -> void:
 		return
 	var scale := FreeKickUIScale.widget_scale(get_viewport().get_visible_rect().size.y)
 	var font := result_card.get_theme_default_font()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.0, 0.01, 0.03, 0.72 * result_card_alpha)
-	style.border_color = Color(result_card_color, 0.55 * result_card_alpha)
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(12)
-	result_card.draw_style_box(style, Rect2(Vector2.ZERO, result_card.size))
+	var bg := Color(0.0, 0.01, 0.03, 0.72 * result_card_alpha)
+	var border := Color(result_card_color, 0.55 * result_card_alpha)
+	result_card.draw_style_box(HudTheme.panel_style(bg, border, 2, HudTheme.RADIUS_CARD), Rect2(Vector2.ZERO, result_card.size))
 	var title_size := roundi(34.0 * scale)
 	result_card.draw_string(font, Vector2(0.0, 46.0 * scale), result_card_title, HORIZONTAL_ALIGNMENT_CENTER, result_card.size.x, title_size, Color(result_card_color, result_card_alpha))
 	if result_card_cause != "":
@@ -728,16 +709,27 @@ func _draw_result_card() -> void:
 
 func _create_score_hud() -> Control:
 	var root := get_node_or_null("Root") as Control
+	# Asset-backed chrome: the generated sci-fi frame (9-slice) is the panel;
+	# the custom-drawn scoreboard content renders on top as a full-rect child.
+	var frame := NinePatchRect.new()
+	frame.name = "ScoreHudFrame"
+	frame.texture = load("res://assets/ui/score_frame.png")
+	frame.patch_margin_left = 64
+	frame.patch_margin_right = 64
+	frame.patch_margin_top = 46
+	frame.patch_margin_bottom = 46
+	frame.size = SCORE_HUD_DESIGN_SIZE
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var hud := ModernScoreHud.new()
 	hud.name = "ModernScoreHud"
-	hud.size = Vector2(980.0, 180.0)
-	hud.scale = Vector2.ONE * FreeKickUIScale.widget_scale(720.0)
+	hud.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	frame.add_child(hud)
 	if root != null:
-		root.add_child(hud)
+		root.add_child(frame)
 	else:
-		add_child(hud)
-	return hud
+		add_child(frame)
+	return frame
 
 const SCORE_HUD_DESIGN_SIZE := Vector2(980.0, 180.0)
 const SCORE_HUD_BOTTOM_BAND := 215.0  # design px reserved for the score HUD at the top
@@ -1028,6 +1020,7 @@ func _apply_mvp_layout() -> void:
 	_style_button(next_spot_button, next_spot_button.text)
 	_place_anchored(next_spot_button, Vector2(0.0, 1.0), Vector2(24.0, 110.0), Vector2(196.0, 40.0))
 	next_spot_button.visible = false
+	_layout_corner_modules()
 
 func align_power_meter_to_ball(ball: Node3D, camera: Camera3D) -> void:
 	if ball == null or camera == null or power_meter == null:

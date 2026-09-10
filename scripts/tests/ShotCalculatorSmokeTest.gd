@@ -195,7 +195,7 @@ func _test_plant_distance_scales_aim_angle() -> bool:
 	return passed
 
 func _test_plant_distance_optimal_keeps_full_lane() -> bool:
-	# At the optimal plant distance the full aim lane is preserved (11 degrees).
+	# At the optimal plant distance the full aim lane is preserved (35 degrees).
 	var input := _base_input(0.75)
 	input.support_vector = Vector2(0.25, 0.0)
 	input.support_aim_target = 1.0
@@ -204,8 +204,8 @@ func _test_plant_distance_optimal_keeps_full_lane() -> bool:
 	center_input.support_aim_target = 0.0
 	var full := ShotCalculator.calculate(input, _stats(), _environment(), _difficulty())
 	var center := ShotCalculator.calculate(center_input, _stats(), _environment(), _difficulty())
-	var passed := is_equal_approx(absf(full.horizontal_angle - center.horizontal_angle), 11.0)
-	_print_result("optimal plant keeps full aim lane (11 deg)", passed)
+	var passed := is_equal_approx(absf(full.horizontal_angle - center.horizontal_angle), 35.0)
+	_print_result("optimal plant keeps full aim lane (35 deg)", passed)
 	return passed
 
 func _test_support_aim_target_reaches_goal_side() -> bool:
@@ -238,8 +238,8 @@ func _test_spot_angle_is_not_double_counted() -> bool:
 	var center := ShotCalculator.calculate(center_input, _stats(), environment, _difficulty())
 	var right := ShotCalculator.calculate(right_input, _stats(), environment, _difficulty())
 	# The spot angle is already represented by environment.base_goal_direction.
-	# horizontal_angle should only contain the support aim offset: full target lane = 11 degrees.
-	var passed := is_equal_approx(absf(right.horizontal_angle - center.horizontal_angle), 11.0)
+	# horizontal_angle should only contain the support aim offset: full target lane = 35 degrees.
+	var passed := is_equal_approx(absf(right.horizontal_angle - center.horizontal_angle), 35.0)
 	_print_result("spot angle is not double-counted", passed)
 	return passed
 

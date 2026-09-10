@@ -143,7 +143,6 @@ class ModernScoreHud:
 			draw_arc(center, 17.0, 0.0, TAU, 48, stroke, 2.2)
 			if used:
 				draw_arc(center, 23.0, 0.0, TAU, 48, Color(NEON_ORANGE, 0.26), 5.0)
-		draw_string(font, rect.position + Vector2(174.0, 67.0), "%d / %d" % [misses, max_misses], HORIZONTAL_ALIGNMENT_LEFT, 74.0, 27, Color(1.0, 1.0, 1.0, 0.92))
 
 	func _draw_progress_bar(rect: Rect2, value: float, accent: Color) -> void:
 		var bg := StyleBoxFlat.new()
@@ -340,8 +339,9 @@ func _update_uiroot_margins() -> void:
 	ui_root.offset_top = maxf(0.0, safe_viewport.position.y)
 	ui_root.offset_right = -maxf(0.0, viewport_size.x - safe_viewport.end.x)
 	ui_root.offset_bottom = -maxf(0.0, viewport_size.y - safe_viewport.end.y)
-	if score_hud != null:
-		score_hud.scale = Vector2.ONE * FreeKickUIScale.widget_scale(viewport_size.y)
+	var score_hud_frame := score_hud.get_parent() if score_hud != null else null
+	if score_hud_frame != null:
+		score_hud_frame.scale = Vector2.ONE * FreeKickUIScale.widget_scale(viewport_size.y)
 		_center_score_hud()
 	if result_card != null:
 		var s := FreeKickUIScale.widget_scale(viewport_size.y)
@@ -729,7 +729,7 @@ func _create_score_hud() -> Control:
 		root.add_child(frame)
 	else:
 		add_child(frame)
-	return frame
+	return hud
 
 const SCORE_HUD_DESIGN_SIZE := Vector2(980.0, 180.0)
 const SCORE_HUD_BOTTOM_BAND := 215.0  # design px reserved for the score HUD at the top
@@ -737,19 +737,22 @@ const SCORE_HUD_BOTTOM_BAND := 215.0  # design px reserved for the score HUD at 
 func _center_score_hud() -> void:
 	if score_hud == null or ui_root == null:
 		return
+	var frame := score_hud.get_parent() as Control
+	if frame == null:
+		return
 	# Anchor+offset sizing mutates `size`; always recompute from the design size
 	# so repeated resizes cannot compound-shrink the HUD.
-	score_hud.size = SCORE_HUD_DESIGN_SIZE
-	score_hud.pivot_offset = SCORE_HUD_DESIGN_SIZE * 0.5
-	score_hud.anchor_left = 0.5
-	score_hud.anchor_right = 0.5
-	score_hud.anchor_top = 0.0
-	score_hud.anchor_bottom = 0.0
-	var half_w := SCORE_HUD_DESIGN_SIZE.x * score_hud.scale.x * 0.5
-	score_hud.offset_left = -half_w
-	score_hud.offset_right = half_w
-	score_hud.offset_top = 20.0
-	score_hud.offset_bottom = 20.0 + SCORE_HUD_DESIGN_SIZE.y * score_hud.scale.y
+	frame.size = SCORE_HUD_DESIGN_SIZE
+	frame.pivot_offset = SCORE_HUD_DESIGN_SIZE * 0.5
+	frame.anchor_left = 0.5
+	frame.anchor_right = 0.5
+	frame.anchor_top = 0.0
+	frame.anchor_bottom = 0.0
+	var half_w := SCORE_HUD_DESIGN_SIZE.x * frame.scale.x * 0.5
+	frame.offset_left = -half_w
+	frame.offset_right = half_w
+	frame.offset_top = 20.0
+	frame.offset_bottom = 20.0 + SCORE_HUD_DESIGN_SIZE.y * frame.scale.y
 
 func set_kicking_foot(foot: String) -> void:
 	kicking_foot = foot

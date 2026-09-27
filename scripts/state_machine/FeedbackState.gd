@@ -12,6 +12,7 @@ func enter(_controller: FreeKickController) -> void:
 		if controller.trajectory_ghost != null:
 			controller.trajectory_ghost.show_telemetry(controller.shot_observer.telemetry)
 	controller.ui.show_feedback(report, AUTO_RESTART_DELAY_SECONDS)
+	controller.ui.show_feedback_snapshots(controller.input_data)
 	controller.free_kick_finished.emit(report)
 	_auto_restart_after_delay(controller.run_id)
 

@@ -10,6 +10,10 @@ extends Resource
 @export_range(0.0, 1.0, 0.01) var input_smoothing_assist: float = 0.35
 @export var auto_commit_threshold_multiplier: float = 1.0
 
+# Step 1 substep A: run-up angle/distance (tap-drag-release, fixed before the hold-for-power substep). Untimed.
+@export_range(0.0, 0.5, 0.01) var runup_power_bonus_max: float = 0.18 # launch-speed bonus at full run-up distance
+@export_range(0.0, 0.8, 0.01) var runup_precision_penalty_max: float = 0.55 # shrinks the step-1 power hold window at full run-up distance
+
 # Power pressure: charging past the ideal zone shrinks the step 2/3 time budget.
 @export_range(0.0, 1.0, 0.01) var time_penalty_threshold: float = 0.85  # keep in sync with ShotCalculator.IDEAL_POWER_MAX
 @export var min_step2_time: float = 0.8  # step 2 (support foot) window in seconds at 100% power

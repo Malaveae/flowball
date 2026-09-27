@@ -3,7 +3,7 @@ extends Node
 
 signal state_changed(state_name: StringName)
 
-@export var initial_state: StringName = &"PowerState"
+@export var initial_state: StringName = &"RunUpState"
 
 var controller: FreeKickController
 var current_state: FreeKickState

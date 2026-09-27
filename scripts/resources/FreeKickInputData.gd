@@ -5,6 +5,10 @@ extends Resource
 @export_range(0.0, 1.0, 0.001) var power_normalized: float = 0.0
 @export_enum("right", "left") var selected_foot: String = "right"
 
+@export_range(0.0, 90.0, 0.1) var runup_angle_deg: float = 0.0 # angle from the goal line: 0 = lateral/parallel (best curl), 90 = perpendicular/straight-on (best straight power)
+@export_range(0.0, 15.0, 0.1) var runup_distance_m: float = 0.0 # literal run-up distance in meters (power bonus + precision risk)
+@export var used_default_runup: bool = false
+
 @export var support_touch_pos: Vector2 = Vector2.ZERO
 @export var support_vector: Vector2 = Vector2.ZERO
 @export_range(-1.0, 1.0, 0.001) var plant_depth: float = 0.0
@@ -27,6 +31,9 @@ func reset() -> void:
 	hold_time = 0.0
 	power_normalized = 0.0
 	selected_foot = "right"
+	runup_angle_deg = 0.0
+	runup_distance_m = 0.0
+	used_default_runup = false
 	support_touch_pos = Vector2.ZERO
 	support_vector = Vector2.ZERO
 	plant_depth = 0.0

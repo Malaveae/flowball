@@ -9,6 +9,39 @@ const MAX_SPIN_RATE := 140.0
 const MAX_HORIZONTAL_OFFSET_DEG := 35.0
 const IDEAL_POWER_MAX := 0.85
 
+# Step 1 substep A: run-up angle is the real approach angle, measured from the goal line
+# (0 = running parallel to the goal / lateral approach, 90 = perpendicular to the goal /
+# straight-on approach). It never touches shot direction - it's pure technique, trading
+# the straight-power/puntera ceiling against the curl/spin ceiling.
+#
+# Grounded in kicking biomechanics research (Isokawa & Lees; see also the general finding
+# that approach angle can range ~15-90deg depending on whether power or curl is wanted,
+# with wider angles trading power for hip-rotation room to wrap the ball). That literature
+# measures approach angle from the ball-target line (0 = straight, 90 = lateral) - the
+# opposite convention from this field, so a straight-on run here (90deg) corresponds to
+# their ~0deg (minimal rotation, ideal for a direct/knuckle strike - a center puntera can't
+# be hit clean without it), and a lateral run here (0deg) corresponds to their ~90deg
+# (maximum hip-rotation room, best curl ceiling, worst straight-power ceiling). Their
+# reported 30-45deg power/curl sweet spot sits at 45-60deg in this field's convention.
+const RUNUP_ANGLE_MAX_DEG := 90.0
+const RUNUP_SPEED_CEILING_AT_LATERAL_ANGLE := 0.4  # 0deg: a center puntera can't land clean - no forward momentum through the ball
+const RUNUP_SPEED_CEILING_AT_STRAIGHT_ANGLE := 1.0 # 90deg: full access to top speed - ideal for a straight/knuckle strike
+const RUNUP_SPIN_CEILING_AT_LATERAL_ANGLE := 1.0   # 0deg: full curl/wrap potential - maximum hip-rotation room
+const RUNUP_SPIN_CEILING_AT_STRAIGHT_ANGLE := 0.5  # 90deg: curl capped - no room to rotate the hip on a straight run
+
+# Run-up distance (step 1 substep A) is a literal ground distance, not a normalized 0..1 - a
+# longer approach gives more room to build speed, at the cost of a harder power-release timing.
+const RUNUP_DISTANCE_MAX_M := 15.0
+
+# The run-up angle also reshapes the step-1 hold curve itself: a straight-on/power run-up
+# reaches the ideal power point sooner AND with a wider, more forgiving window (easy power);
+# a lateral/curl run-up is slower to build up through the low/control range, then whips
+# through the remaining range in a narrower window once it gets going (harder to land).
+const RUNUP_POWER_CENTER_SCALE_AT_LATERAL_ANGLE := 1.15
+const RUNUP_POWER_CENTER_SCALE_AT_STRAIGHT_ANGLE := 0.85
+const RUNUP_POWER_SMOOTH_SCALE_AT_LATERAL_ANGLE := 0.75
+const RUNUP_POWER_SMOOTH_SCALE_AT_STRAIGHT_ANGLE := 1.25
+
 # Step 1 power curve (sigmoid). The ideal window width follows control stats;
 # the time to reach the ideal point follows kick_power.
 const POWER_CURVE_CENTER_MIN := 0.85  # max-power players: ideal reached fastest
@@ -85,12 +118,21 @@ static func calculate(
 		quality_dispersion = _quality_dispersion(gesture_quality, composure, gesture_tech)
 	params.quality_dispersion_degrees = quality_dispersion
 
+	# Run-up angle (step 1 substep A) caps how much curl the Step-3 gesture can convert into:
+	# a straight run-up halves the ceiling even for a perfect curl swipe, a wide run-up leaves
+	# the gesture's full potential untouched. It never adds curl by itself. Opt-in: a player who
+	# didn't engage the run-up gesture (a bare tap) gets no ceiling at all, not the straight-run cap.
+	if not input.used_default_runup:
+		var runup_angle_t := clampf(input.runup_angle_deg, 0.0, RUNUP_ANGLE_MAX_DEG) / RUNUP_ANGLE_MAX_DEG
+		var spin_ceiling := lerpf(RUNUP_SPIN_CEILING_AT_LATERAL_ANGLE, RUNUP_SPIN_CEILING_AT_STRAIGHT_ANGLE, runup_angle_t)
+		params.spin_rate = minf(params.spin_rate, MAX_SPIN_RATE * spin_ceiling)
+
 	params.error_cone_degrees = _error_cone(accuracy, technique, params.stability, overpower, weak_foot_penalty, timeout_penalty_value) + quality_dispersion
 	params.final_error = _deterministic_error(input, params.error_cone_degrees)
 	params.horizontal_angle += params.final_error.x
 	params.elevation_angle = clampf(params.elevation_angle + params.final_error.y, MIN_ELEVATION_DEG, MAX_ELEVATION_DEG)
 
-	var speed := _launch_speed(params.power, power_stat, environment.distance_to_goal, input.support_quality, input.step2_to_step3_ms)
+	var speed := _launch_speed(params.power, power_stat, environment.distance_to_goal, input.support_quality, input.step2_to_step3_ms, input.runup_distance_m, difficulty.runup_power_bonus_max, input.runup_angle_deg, not input.used_default_runup)
 	params.launch_velocity = _launch_velocity(environment.base_goal_direction, params.horizontal_angle, params.elevation_angle, speed)
 	params.shot_type = _classify_shot(params, swipe_vector)
 	return params
@@ -100,7 +142,7 @@ static func calculate(
 ##   a control player can land the ideal power more easily.
 ## - Center (where the slope is steepest) scales with kick_power:
 ##   a power player reaches the ideal point sooner, trading window for speed.
-static func power_from_hold(hold_time: float, stats: PlayerFreeKickStats) -> float:
+static func power_from_hold(hold_time: float, stats: PlayerFreeKickStats, runup_distance_m: float = 0.0, difficulty: FreeKickDifficulty = null, runup_angle_deg: float = 0.0, runup_engaged: bool = false) -> float:
 	if stats == null:
 		stats = PlayerFreeKickStats.new()
 	var control := (stats.normalized(stats.free_kick_accuracy)
@@ -109,6 +151,19 @@ static func power_from_hold(hold_time: float, stats: PlayerFreeKickStats) -> flo
 	var power_stat := stats.normalized(stats.kick_power)
 	var center := lerpf(POWER_CURVE_CENTER_MAX, POWER_CURVE_CENTER_MIN, power_stat)
 	var smooth := lerpf(POWER_CURVE_SMOOTH_MIN, POWER_CURVE_SMOOTH_MAX, control)
+	# Run-up angle reshapes the curve itself: straight-on/power reaches the ideal point
+	# sooner and with a wider, more forgiving window; lateral/curl is slower to build up
+	# and then whips through a narrower window once it gets going. Opt-in, like the
+	# speed/spin ceilings in calculate().
+	if runup_engaged:
+		var runup_angle_t := clampf(runup_angle_deg, 0.0, RUNUP_ANGLE_MAX_DEG) / RUNUP_ANGLE_MAX_DEG
+		center *= lerpf(RUNUP_POWER_CENTER_SCALE_AT_LATERAL_ANGLE, RUNUP_POWER_CENTER_SCALE_AT_STRAIGHT_ANGLE, runup_angle_t)
+		smooth *= lerpf(RUNUP_POWER_SMOOTH_SCALE_AT_LATERAL_ANGLE, RUNUP_POWER_SMOOTH_SCALE_AT_STRAIGHT_ANGLE, runup_angle_t)
+	# Run-up distance (step 1 substep A) narrows the hold window: a longer run-up steepens
+	# the curve so the same release-timing error swings power further off target.
+	var runup_distance_t := clampf(runup_distance_m / RUNUP_DISTANCE_MAX_M, 0.0, 1.0)
+	var precision_penalty_max := 0.55 if difficulty == null else difficulty.runup_precision_penalty_max
+	smooth *= (1.0 - runup_distance_t * precision_penalty_max)
 	return _sigmoid_hold(hold_time, center, smooth)
 
 static func _sigmoid_hold(t: float, t0: float, s: float) -> float:
@@ -117,7 +172,7 @@ static func _sigmoid_hold(t: float, t0: float, s: float) -> float:
 	var sig_now := 1.0 / (1.0 + exp(-(t - t0) / s))
 	return clampf((sig_now - sig_start) / (1.0 - sig_start), 0.0, 1.0)
 
-static func _launch_speed(power: float, power_stat: float, distance: float, support_quality: float, step2_to_step3_ms: int = 0) -> float:
+static func _launch_speed(power: float, power_stat: float, distance: float, support_quality: float, step2_to_step3_ms: int = 0, runup_distance_m: float = 0.0, runup_power_bonus_max: float = 0.0, runup_angle_deg: float = 0.0, runup_engaged: bool = true) -> float:
 	var distance_bonus := clampf((distance - 18.0) / 22.0, 0.0, 0.25)
 	var support_transfer := lerpf(0.62, 1.0, clampf(support_quality, 0.0, 1.0))
 	# Quick transition from step 2 support foot to step 3 ball contact rewards
@@ -126,8 +181,19 @@ static func _launch_speed(power: float, power_stat: float, distance: float, supp
 	if step2_to_step3_ms > 0:
 		var transition_quality := clampf(1.0 - float(step2_to_step3_ms - 200) / 600.0, 0.0, 1.0)
 		transition_bonus = lerpf(1.0, 1.08, transition_quality)
+	# Run-up distance (step 1 substep A) trades a launch-speed bonus against the power-hold
+	# precision penalty applied in power_from_hold.
+	var runup_distance_t := clampf(runup_distance_m / RUNUP_DISTANCE_MAX_M, 0.0, 1.0)
+	var runup_bonus := 1.0 + runup_distance_t * runup_power_bonus_max
 	var speed := lerpf(14.0, MAX_LAUNCH_SPEED, power) * lerpf(0.85, 1.08, power_stat) * support_transfer + distance_bonus * 4.0
-	speed *= transition_bonus
+	speed *= transition_bonus * runup_bonus
+	# Run-up angle caps the top-end speed: a lateral/curl-style run-up trades away straight
+	# pace, a straight-on run-up keeps full access to top speed. Opt-in, like the spin
+	# ceiling above: no engagement with the run-up gesture means no cap at all.
+	if runup_engaged:
+		var runup_angle_t := clampf(runup_angle_deg, 0.0, RUNUP_ANGLE_MAX_DEG) / RUNUP_ANGLE_MAX_DEG
+		var speed_ceiling := lerpf(RUNUP_SPEED_CEILING_AT_LATERAL_ANGLE, RUNUP_SPEED_CEILING_AT_STRAIGHT_ANGLE, runup_angle_t)
+		speed = minf(speed, MAX_LAUNCH_SPEED * speed_ceiling)
 	return clampf(speed, MIN_LAUNCH_SPEED, MAX_LAUNCH_SPEED)
 
 static func _launch_velocity(base_direction: Vector3, horizontal_deg: float, elevation_deg: float, speed: float) -> Vector3:
@@ -237,7 +303,7 @@ static func _signed_deadzone(value: float, deadzone: float) -> float:
 	return signf(value) * clampf((magnitude - deadzone) / (1.0 - deadzone), 0.0, 1.0)
 
 static func _timeout_penalty(input: FreeKickInputData, difficulty: FreeKickDifficulty, composure: float) -> float:
-	var missed_steps := (1 if input.used_default_support else 0) + (1 if input.used_default_contact else 0)
+	var missed_steps := (1 if input.used_default_runup else 0) + (1 if input.used_default_support else 0) + (1 if input.used_default_contact else 0)
 	if missed_steps == 0:
 		return 0.0
 	return missed_steps * difficulty.default_penalty_scale * difficulty.composure_penalty_scale * (1.0 - composure) * 0.75

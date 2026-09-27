@@ -37,6 +37,12 @@ func _init() -> void:
 	ok = _test_gesture_curvature_and_quality() and ok
 	ok = _test_gesture_l_max_power_and_curve() and ok
 	ok = _test_instep_boosts_curl_over_straight() and ok
+	ok = _test_runup_angle_leaves_horizontal_aim_unchanged() and ok
+	ok = _test_runup_angle_trades_power_for_curl() and ok
+	ok = _test_runup_distance_boosts_launch_speed() and ok
+	ok = _test_runup_distance_narrows_power_precision() and ok
+	ok = _test_runup_angle_reaches_ideal_power_sooner_when_straight() and ok
+	ok = _test_runup_angle_widens_power_window_when_straight() and ok
 	quit(0 if ok else 1)
 
 func _base_input(power: float = 0.7) -> FreeKickInputData:
@@ -44,6 +50,9 @@ func _base_input(power: float = 0.7) -> FreeKickInputData:
 	input.hold_time = 1.0
 	input.power_normalized = power
 	input.selected_foot = "right"
+	# Baseline tests predate the run-up substep and don't engage it - opt-in ceilings
+	# (see ShotCalculator run-up section) must stay off so unrelated tests are unaffected.
+	input.used_default_runup = true
 	input.support_vector = Vector2(0.2, 0.0)
 	input.plant_depth = 0.0
 	input.impact_point = Vector2(0.15, -0.2)
@@ -528,6 +537,97 @@ func _test_instep_boosts_curl_over_straight() -> bool:
 		and straight.gesture_technique == ContactGesture.Technique.LACE \
 		and instep.spin_rate > straight.spin_rate
 	_print_result("instep rosca boosts curl over same-length straight swipe", passed)
+	return passed
+
+func _test_runup_angle_leaves_horizontal_aim_unchanged() -> bool:
+	var low_angle_input := _base_input()
+	low_angle_input.used_default_runup = false
+	low_angle_input.runup_angle_deg = 0.0
+	var high_angle_input := _base_input()
+	high_angle_input.used_default_runup = false
+	high_angle_input.runup_angle_deg = ShotCalculator.RUNUP_ANGLE_MAX_DEG
+	var low := ShotCalculator.calculate(low_angle_input, _stats(), _environment(), _difficulty())
+	var high := ShotCalculator.calculate(high_angle_input, _stats(), _environment(), _difficulty())
+	var passed := is_equal_approx(low.horizontal_angle, high.horizontal_angle)
+	_print_result("run-up angle is pure technique - it never steers the shot", passed)
+	return passed
+
+func _test_runup_angle_trades_power_for_curl() -> bool:
+	# Angle convention: 0 = lateral/parallel to the goal line (best curl ceiling, worst
+	# straight-power ceiling), RUNUP_ANGLE_MAX_DEG (90) = perpendicular/straight-on (best
+	# straight-power/puntera ceiling, worst curl ceiling). Grounded in kicking biomechanics
+	# research (Isokawa & Lees): wider approach angles trade power for hip-rotation room.
+	var curl_swipe := PackedVector2Array([Vector2.ZERO, Vector2(0.75, -0.2)])
+	var straight_runup := _base_input(0.95)
+	straight_runup.support_vector = Vector2.ZERO
+	straight_runup.impact_point = Vector2(0.55, 0.0)
+	straight_runup.swipe_points = curl_swipe
+	straight_runup.used_default_runup = false
+	straight_runup.runup_angle_deg = ShotCalculator.RUNUP_ANGLE_MAX_DEG
+	var lateral_runup := _base_input(0.95)
+	lateral_runup.support_vector = Vector2.ZERO
+	lateral_runup.impact_point = Vector2(0.55, 0.0)
+	lateral_runup.swipe_points = curl_swipe
+	lateral_runup.used_default_runup = false
+	lateral_runup.runup_angle_deg = 0.0
+	var straight := ShotCalculator.calculate(straight_runup, _stats(), _environment(), _difficulty())
+	var lateral := ShotCalculator.calculate(lateral_runup, _stats(), _environment(), _difficulty())
+	var passed := (straight.spin_rate <= ShotCalculator.MAX_SPIN_RATE * ShotCalculator.RUNUP_SPIN_CEILING_AT_STRAIGHT_ANGLE + 0.01) \
+		and lateral.spin_rate > straight.spin_rate \
+		and straight.launch_velocity.length() >= lateral.launch_velocity.length()
+	_print_result("straight-on run-up caps curl for speed, lateral run-up caps speed for curl", passed)
+	return passed
+
+func _test_runup_distance_boosts_launch_speed() -> bool:
+	var base_input := _base_input(0.5)
+	var boosted_input := _base_input(0.5)
+	boosted_input.runup_distance_m = ShotCalculator.RUNUP_DISTANCE_MAX_M
+	var base := ShotCalculator.calculate(base_input, _stats(), _environment(), _difficulty())
+	var boosted := ShotCalculator.calculate(boosted_input, _stats(), _environment(), _difficulty())
+	var passed := boosted.launch_velocity.length() > base.launch_velocity.length()
+	_print_result("run-up distance boosts launch speed", passed)
+	return passed
+
+func _test_runup_distance_narrows_power_precision() -> bool:
+	var stats := _stats()
+	var difficulty := _difficulty()
+	var low_risk_swing := absf(ShotCalculator.power_from_hold(1.1, stats, 0.0, difficulty) - ShotCalculator.power_from_hold(0.9, stats, 0.0, difficulty))
+	var high_risk_swing := absf(ShotCalculator.power_from_hold(1.1, stats, ShotCalculator.RUNUP_DISTANCE_MAX_M, difficulty) - ShotCalculator.power_from_hold(0.9, stats, ShotCalculator.RUNUP_DISTANCE_MAX_M, difficulty))
+	var passed := high_risk_swing > low_risk_swing
+	_print_result("run-up distance narrows the power release precision window", passed)
+	return passed
+
+func _test_runup_angle_reaches_ideal_power_sooner_when_straight() -> bool:
+	var stats := _stats()
+	var difficulty := _difficulty()
+	var straight_power := ShotCalculator.power_from_hold(1.0, stats, 0.0, difficulty, ShotCalculator.RUNUP_ANGLE_MAX_DEG, true)
+	var lateral_power := ShotCalculator.power_from_hold(1.0, stats, 0.0, difficulty, 0.0, true)
+	var unengaged_power := ShotCalculator.power_from_hold(1.0, stats, 0.0, difficulty, 0.0, false)
+	var baseline_power := ShotCalculator.power_from_hold(1.0, stats, 0.0, difficulty)
+	var passed := straight_power > lateral_power and is_equal_approx(unengaged_power, baseline_power)
+	_print_result("straight-on run-up reaches the ideal power point sooner than a lateral run-up", passed)
+	return passed
+
+func _test_runup_angle_widens_power_window_when_straight() -> bool:
+	# Compare the power swing over the same +/-0.1s window centered on each angle's OWN
+	# curve center - isolates the smooth/window-width effect from the center-timing shift.
+	var power_stat := 0.75 # matches _stats(): kick_power=75 normalized
+	var control := 0.75    # matches _stats(): accuracy/technique/composure=75 normalized
+	var base_center := lerpf(ShotCalculator.POWER_CURVE_CENTER_MAX, ShotCalculator.POWER_CURVE_CENTER_MIN, power_stat)
+	var straight_center := base_center * ShotCalculator.RUNUP_POWER_CENTER_SCALE_AT_STRAIGHT_ANGLE
+	var lateral_center := base_center * ShotCalculator.RUNUP_POWER_CENTER_SCALE_AT_LATERAL_ANGLE
+	var stats := _stats()
+	var difficulty := _difficulty()
+	var straight_swing := absf(
+		ShotCalculator.power_from_hold(straight_center + 0.1, stats, 0.0, difficulty, ShotCalculator.RUNUP_ANGLE_MAX_DEG, true)
+		- ShotCalculator.power_from_hold(straight_center - 0.1, stats, 0.0, difficulty, ShotCalculator.RUNUP_ANGLE_MAX_DEG, true)
+	)
+	var lateral_swing := absf(
+		ShotCalculator.power_from_hold(lateral_center + 0.1, stats, 0.0, difficulty, 0.0, true)
+		- ShotCalculator.power_from_hold(lateral_center - 0.1, stats, 0.0, difficulty, 0.0, true)
+	)
+	var passed := straight_swing < lateral_swing
+	_print_result("straight-on run-up widens the power window (more forgiving) than a lateral run-up", passed)
 	return passed
 
 func _print_result(label: String, passed: bool) -> void:

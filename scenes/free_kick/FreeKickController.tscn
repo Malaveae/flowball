@@ -1,8 +1,9 @@
-[gd_scene load_steps=19 format=3]
+[gd_scene load_steps=20 format=3]
 
 [ext_resource type="Script" path="res://scripts/state_machine/FreeKickController.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/state_machine/FreeKickStateMachine.gd" id="2"]
 [ext_resource type="Script" path="res://scripts/state_machine/PowerState.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/state_machine/RunUpState.gd" id="16"]
 [ext_resource type="Script" path="res://scripts/state_machine/SupportFootState.gd" id="4"]
 [ext_resource type="Script" path="res://scripts/state_machine/BallContactState.gd" id="5"]
 [ext_resource type="Script" path="res://scripts/state_machine/CalculateShotState.gd" id="6"]
@@ -23,6 +24,9 @@ kicker_path = NodePath("../Player3D")
 
 [node name="FreeKickStateMachine" type="Node" parent="."]
 script = ExtResource("2")
+
+[node name="RunUpState" type="Node" parent="FreeKickStateMachine"]
+script = ExtResource("16")
 
 [node name="PowerState" type="Node" parent="FreeKickStateMachine"]
 script = ExtResource("3")

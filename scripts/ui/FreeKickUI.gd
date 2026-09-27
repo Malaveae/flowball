@@ -8,6 +8,18 @@ const WIND_HUD_MARGIN := Vector2(24.0, 24.0)
 const DIST_HUD_SIZE := Vector2(148.0, 68.0)
 const DIST_HUD_MARGIN := Vector2(24.0, 24.0)
 
+## Mirrors RunUpState.MAX_DRAG_PX - duplicated locally so this file doesn't depend on
+## RunUpState's global class_name being registered yet (headless script runs can hit a
+## class-cache miss on a brand-new class_name referenced from another script).
+const RUNUP_MAX_DRAG_PX := 220.0
+
+# Post-shot feedback recap: 4 frozen mini-diagrams (run-up, power, plant, contact).
+const FEEDBACK_SNAPSHOT_WIDTH := 150.0
+const FEEDBACK_SNAPSHOT_GAP := 14.0
+const FEEDBACK_SNAPSHOT_HEIGHT := 168.0
+const FEEDBACK_SNAPSHOTS_COUNT := 4
+const FEEDBACK_SNAPSHOTS_TOTAL_WIDTH := FEEDBACK_SNAPSHOT_WIDTH * FEEDBACK_SNAPSHOTS_COUNT + FEEDBACK_SNAPSHOT_GAP * (FEEDBACK_SNAPSHOTS_COUNT - 1)
+
 signal restart_requested
 signal switch_foot_requested
 signal next_spot_requested
@@ -283,6 +295,14 @@ class DistAngleHud extends Control:
 var kicking_foot := "right"
 var support_marker_hint: Control
 var support_zone_overlay: Control
+var runup_overlay: Control
+var runup_anchor_screen := Vector2.ZERO
+var runup_marker_screen := Vector2.ZERO
+var runup_arc := Vector2(180.0, 270.0) # degrees clockwise from 12 o'clock, locked foot's valid arc
+var runup_has_marker := false
+var runup_angle_deg := 0.0
+var runup_distance_m := 0.0
+var runup_side := "right"
 var left_support_boot_texture: Texture2D
 var support_zone_center := Vector2(640.0, 360.0)
 var support_zone_radius := 150.0
@@ -301,6 +321,17 @@ var goal_banner_progress := 0.0
 var goal_banner_alpha := 1.0
 var wind_module: Control
 var dist_angle_module: Control
+var feedback_snapshots_overlay: Control
+var feedback_runup_angle_deg := 0.0
+var feedback_runup_distance_m := 0.0
+var feedback_runup_used_default := true
+var feedback_kicking_foot := "right"
+var feedback_power := 0.0
+var feedback_support_vector := Vector2.ZERO
+var feedback_support_foot_angle := 0.0
+var feedback_has_support := false
+var feedback_impact_point := Vector2.ZERO
+var feedback_swipe_points: PackedVector2Array = PackedVector2Array()
 
 func _ready() -> void:
 	ui_root = get_node_or_null("Root") as Control
@@ -313,10 +344,12 @@ func _ready() -> void:
 	result_card = _create_result_card()
 	left_support_boot_texture = LEFT_SUPPORT_BOOT_TEXTURE
 	support_zone_overlay = _create_support_zone_overlay()
+	runup_overlay = _create_runup_overlay()
 	support_marker_hint = _create_support_marker_hint()
 	goal_banner = _create_goal_banner()
 	wind_module = _create_wind_module()
 	dist_angle_module = _create_dist_angle_module()
+	feedback_snapshots_overlay = _create_feedback_snapshots_overlay()
 	_apply_mvp_layout()
 	_center_score_hud()
 	restart_button.pressed.connect(func() -> void: restart_requested.emit())
@@ -350,6 +383,14 @@ func _update_uiroot_margins() -> void:
 		result_card.offset_top = 190.0 * s
 		result_card.offset_bottom = (190.0 + 130.0) * s
 		result_card.size = Vector2(420.0 * s, 130.0 * s)
+	if feedback_snapshots_overlay != null:
+		var s3 := FreeKickUIScale.widget_scale(viewport_size.y)
+		var total_w := FEEDBACK_SNAPSHOTS_TOTAL_WIDTH * s3
+		feedback_snapshots_overlay.offset_left = -total_w * 0.5
+		feedback_snapshots_overlay.offset_right = total_w * 0.5
+		feedback_snapshots_overlay.offset_top = 335.0 * s3
+		feedback_snapshots_overlay.offset_bottom = (335.0 + FEEDBACK_SNAPSHOT_HEIGHT) * s3
+		feedback_snapshots_overlay.size = Vector2(total_w, FEEDBACK_SNAPSHOT_HEIGHT * s3)
 	_layout_corner_modules()
 
 ## Positions `control` inside ui_root at a normalized anchor point (0..1) with an edge margin.
@@ -452,6 +493,10 @@ func hide_all() -> void:
 		support_marker_hint.visible = false
 	if support_zone_overlay != null:
 		support_zone_overlay.visible = false
+	if runup_overlay != null:
+		runup_overlay.visible = false
+	if feedback_snapshots_overlay != null:
+		feedback_snapshots_overlay.visible = false
 
 func _set_active_step(step: int) -> void:
 	if score_hud != null and score_hud.has_method("set_active_step"):
@@ -517,7 +562,7 @@ func _create_support_zone_overlay() -> Control:
 				var aim_end := marker + Vector2.UP.rotated(aim_angle) * aim_len
 				# Legal fan +/-30 deg around the heel: limits visible without guessing.
 				overlay.draw_arc(marker, aim_len * 0.85, -PI / 2.0 - deg_to_rad(30.0), -PI / 2.0 + deg_to_rad(30.0), 24, Color(0.55, 0.9, 1.0, 0.35), 1.5)
-				overlay.draw_line(marker, aim_end, Color(1.0, 0.86, 0.22, 0.95), 3.0)
+				overlay.draw_dashed_line(marker, aim_end, Color(1.0, 0.86, 0.22, 0.95), 3.0, 8.0)
 				overlay.draw_circle(aim_end, 5.0, Color(1.0, 0.86, 0.22, 1.0))
 				_draw_support_foot_indicator(overlay, marker, true, aim_angle)
 			if support_zone_flash > 0.01:
@@ -525,6 +570,48 @@ func _create_support_zone_overlay() -> Control:
 				overlay.draw_arc(marker, 24.0, 0.0, TAU, 32, Color(0.3, 1.0, 0.45, 0.8 * support_zone_flash), 3.0)
 		var side_text := "LEFT" if kicking_foot == "right" else "RIGHT"
 		overlay.draw_string(overlay.get_theme_default_font(), center + Vector2(-96.0, radius + 28.0), "Plant zone: %s side - slide to aim" % side_text, HORIZONTAL_ALIGNMENT_CENTER, 192.0, 13, Color(1, 1, 1, 0.7))
+	)
+	if root != null:
+		root.add_child(overlay)
+	else:
+		add_child(overlay)
+	return overlay
+
+func _create_runup_overlay() -> Control:
+	var root := get_node_or_null("Root") as Control
+	var overlay := Control.new()
+	overlay.name = "RunUpOverlay"
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.visible = false
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.draw.connect(func() -> void:
+		if not runup_has_marker:
+			return
+		var center := runup_anchor_screen
+		var max_radius := RUNUP_MAX_DRAG_PX
+		overlay.draw_arc(center, max_radius, 0.0, TAU, 64, Color(1, 1, 1, 0.12), 1.5)
+		# Valid arc wedge for the locked foot - the only area the drag can actually land in.
+		var arc_start_rad := deg_to_rad(runup_arc.x - 90.0)
+		var arc_end_rad := deg_to_rad(runup_arc.y - 90.0)
+		var wedge_points := PackedVector2Array([center])
+		var steps := 20
+		for i in range(steps + 1):
+			var t := lerpf(arc_start_rad, arc_end_rad, float(i) / float(steps))
+			wedge_points.append(center + Vector2(cos(t), sin(t)) * max_radius)
+		var wedge_color := HudTheme.GREEN_SUCCESS
+		wedge_color.a = 0.10
+		overlay.draw_colored_polygon(wedge_points, wedge_color)
+		overlay.draw_arc(center, max_radius, arc_start_rad, arc_end_rad, steps, HudTheme.GREEN_SUCCESS, 2.0)
+		overlay.draw_line(center, center + Vector2(cos(arc_start_rad), sin(arc_start_rad)) * max_radius, HudTheme.GREEN_SUCCESS, 1.5)
+		overlay.draw_line(center, center + Vector2(cos(arc_end_rad), sin(arc_end_rad)) * max_radius, HudTheme.GREEN_SUCCESS, 1.5)
+		# Marker: risk color ramps toward orange as run-up distance grows.
+		var distance_t := clampf(runup_distance_m / ShotCalculator.RUNUP_DISTANCE_MAX_M, 0.0, 1.0)
+		var risk_color := HudTheme.CYAN_VALUE.lerp(HudTheme.ORANGE_BRIGHT, distance_t)
+		overlay.draw_line(center, runup_marker_screen, risk_color, 3.0)
+		overlay.draw_circle(runup_marker_screen, 8.0, risk_color)
+		overlay.draw_circle(center, 5.0, Color(1, 1, 1, 0.6))
+		var readout := "%.0f deg (%s) - %s foot - %.1fm" % [runup_angle_deg, _runup_style_label(runup_angle_deg), runup_side.to_upper(), runup_distance_m]
+		overlay.draw_string(overlay.get_theme_default_font(), center + Vector2(-110.0, max_radius + 30.0), readout, HORIZONTAL_ALIGNMENT_CENTER, 220.0, 12, Color(1, 1, 1, 0.75))
 	)
 	if root != null:
 		root.add_child(overlay)
@@ -613,6 +700,151 @@ func _create_result_card() -> Control:
 	else:
 		add_child(card)
 	return card
+
+func _create_feedback_snapshots_overlay() -> Control:
+	var overlay := Control.new()
+	overlay.name = "FeedbackSnapshots"
+	overlay.visible = false
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.anchor_left = 0.5
+	overlay.anchor_right = 0.5
+	overlay.anchor_top = 0.0
+	overlay.anchor_bottom = 0.0
+	var s := FreeKickUIScale.widget_scale(get_viewport().get_visible_rect().size.y if get_viewport().get_visible_rect().size.y > 0.0 else 720.0)
+	var total_w := FEEDBACK_SNAPSHOTS_TOTAL_WIDTH * s
+	overlay.offset_left = -total_w * 0.5
+	overlay.offset_right = total_w * 0.5
+	overlay.offset_top = 335.0 * s
+	overlay.offset_bottom = (335.0 + FEEDBACK_SNAPSHOT_HEIGHT) * s
+	overlay.size = Vector2(total_w, FEEDBACK_SNAPSHOT_HEIGHT * s)
+	overlay.draw.connect(_draw_feedback_snapshots)
+	if ui_root != null:
+		ui_root.add_child(overlay)
+	else:
+		add_child(overlay)
+	return overlay
+
+## Freezes the attempt's raw gesture data for the 4-panel post-shot recap
+## (run-up angle/distance, power, plant position/angle, ball contact).
+func show_feedback_snapshots(input: FreeKickInputData) -> void:
+	if feedback_snapshots_overlay == null or input == null:
+		return
+	feedback_runup_angle_deg = input.runup_angle_deg
+	feedback_runup_distance_m = input.runup_distance_m
+	feedback_runup_used_default = input.used_default_runup
+	feedback_kicking_foot = input.selected_foot
+	feedback_power = input.power_normalized
+	feedback_support_vector = input.support_vector
+	feedback_support_foot_angle = input.support_foot_angle
+	feedback_has_support = not input.used_default_support
+	feedback_impact_point = input.impact_point
+	feedback_swipe_points = input.swipe_points
+	feedback_snapshots_overlay.visible = true
+	feedback_snapshots_overlay.queue_redraw()
+
+func _draw_feedback_snapshots() -> void:
+	var overlay := feedback_snapshots_overlay
+	var s := FreeKickUIScale.widget_scale(get_viewport().get_visible_rect().size.y)
+	var w := FEEDBACK_SNAPSHOT_WIDTH * s
+	var h := FEEDBACK_SNAPSHOT_HEIGHT * s
+	var gap := FEEDBACK_SNAPSHOT_GAP * s
+	for i in range(FEEDBACK_SNAPSHOTS_COUNT):
+		var rect := Rect2(Vector2(float(i) * (w + gap), 0.0), Vector2(w, h))
+		match i:
+			0: _draw_snapshot_runup(overlay, rect)
+			1: _draw_snapshot_power(overlay, rect)
+			2: _draw_snapshot_support(overlay, rect)
+			3: _draw_snapshot_contact(overlay, rect)
+
+func _draw_snapshot_frame(canvas: Control, rect: Rect2, title: String) -> Vector2:
+	canvas.draw_style_box(HudTheme.panel_style(HudTheme.BG_GLASS, HudTheme.CYAN_FRAME_SOFT, 1, HudTheme.RADIUS_PANEL), rect)
+	var font := canvas.get_theme_default_font()
+	canvas.draw_string(font, rect.position + Vector2(8.0, 18.0), title, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 16.0, 11, HudTheme.TEXT_LABEL)
+	return rect.position + Vector2(rect.size.x * 0.5, rect.size.y * 0.5 + 8.0) # diagram center, below the title
+
+## Snapshot 1: run-up angle + distance, drawn as a small line from the ball toward
+## the committed approach direction on the locked foot's side.
+func _draw_snapshot_runup(canvas: Control, rect: Rect2) -> void:
+	var center := _draw_snapshot_frame(canvas, rect, "RUN-UP")
+	var font := canvas.get_theme_default_font()
+	if feedback_runup_used_default:
+		canvas.draw_string(font, center + Vector2(-50.0, 4.0), "NOT USED", HORIZONTAL_ALIGNMENT_CENTER, 100.0, 12, HudTheme.TEXT_FAINT)
+		return
+	var radius := rect.size.y * 0.32
+	canvas.draw_circle(center, 4.0, Color(1.0, 1.0, 1.0, 0.7))
+	# Straight-on (90deg) points down (away from goal, where the run-up comes from);
+	# lateral (0deg) points to the locked foot's side - mirrors RunUpState's own arcs.
+	var lateral_sign := -1.0 if feedback_kicking_foot == "right" else 1.0
+	var angle_t := clampf(feedback_runup_angle_deg, 0.0, ShotCalculator.RUNUP_ANGLE_MAX_DEG) / ShotCalculator.RUNUP_ANGLE_MAX_DEG
+	var dir := Vector2(lateral_sign * (1.0 - angle_t), angle_t).normalized()
+	var distance_t := clampf(feedback_runup_distance_m / ShotCalculator.RUNUP_DISTANCE_MAX_M, 0.0, 1.0)
+	var tip := center + dir * radius * lerpf(0.35, 1.0, distance_t)
+	var risk_color := HudTheme.CYAN_VALUE.lerp(HudTheme.ORANGE_BRIGHT, distance_t)
+	canvas.draw_line(center, tip, risk_color, 3.0)
+	canvas.draw_circle(tip, 5.0, risk_color)
+	var caption := "%.0f° · %.1fm · %s" % [feedback_runup_angle_deg, feedback_runup_distance_m, feedback_kicking_foot.to_upper()]
+	canvas.draw_string(font, rect.position + Vector2(0.0, rect.size.y - 10.0), caption, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 11, HudTheme.TEXT_BODY)
+
+## Snapshot 2: power bar with the same LOW/CONTROL/IDEAL/RISK zones as PowerMeterPanel,
+## frozen at the released value.
+func _draw_snapshot_power(canvas: Control, rect: Rect2) -> void:
+	_draw_snapshot_frame(canvas, rect, "POWER")
+	var font := canvas.get_theme_default_font()
+	var bar_w := 22.0
+	var bar_rect := Rect2(rect.position + Vector2(rect.size.x * 0.5 - bar_w * 0.5, 34.0), Vector2(bar_w, rect.size.y - 62.0))
+	canvas.draw_style_box(HudTheme.panel_style(Color(0.0, 0.0, 0.0, 0.4), HudTheme.CYAN_FRAME_SOFT, 1, 8), bar_rect.grow(3.0))
+	var zone_bounds: Array[Vector2] = [Vector2(0.0, 0.40), Vector2(0.40, 0.70), Vector2(0.70, 0.85), Vector2(0.85, 1.0)]
+	var zone_colors: Array[Color] = [HudTheme.CYAN_VALUE, HudTheme.GREEN_SOFT, HudTheme.YELLOW, HudTheme.RED_RISK]
+	for i in range(zone_bounds.size()):
+		var y1: float = bar_rect.end.y - bar_rect.size.y * zone_bounds[i].x
+		var y0: float = bar_rect.end.y - bar_rect.size.y * zone_bounds[i].y
+		canvas.draw_rect(Rect2(bar_rect.position.x, y0, bar_rect.size.x, y1 - y0), Color(zone_colors[i], 0.55), true)
+	var pointer_y := bar_rect.end.y - bar_rect.size.y * clampf(feedback_power, 0.0, 1.0)
+	var pointer_color := HudTheme.power_zone_color(feedback_power, 1.0)
+	canvas.draw_line(Vector2(bar_rect.position.x - 6.0, pointer_y), Vector2(bar_rect.end.x + 6.0, pointer_y), Color.WHITE, 2.0)
+	canvas.draw_circle(Vector2(bar_rect.end.x + 10.0, pointer_y), 4.0, pointer_color)
+	var caption := "%d%%" % roundi(feedback_power * 100.0)
+	canvas.draw_string(font, rect.position + Vector2(0.0, rect.size.y - 10.0), caption, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 13, pointer_color)
+
+## Snapshot 3: support-foot plant position + aim angle, relative to the ball.
+func _draw_snapshot_support(canvas: Control, rect: Rect2) -> void:
+	var center := _draw_snapshot_frame(canvas, rect, "PLANT")
+	var font := canvas.get_theme_default_font()
+	var radius := rect.size.y * 0.30
+	canvas.draw_circle(center, 6.0, Color.WHITE)
+	if not feedback_has_support:
+		canvas.draw_string(font, center + Vector2(-50.0, 22.0), "DEFAULT", HORIZONTAL_ALIGNMENT_CENTER, 100.0, 12, HudTheme.TEXT_FAINT)
+		return
+	var marker := center + feedback_support_vector.limit_length(1.0) * radius
+	canvas.draw_dashed_line(center, marker, HudTheme.GREEN_SUCCESS, 2.0, 5.0)
+	canvas.draw_circle(marker, 6.0, HudTheme.GREEN_SUCCESS)
+	var toe := marker + Vector2.from_angle(feedback_support_foot_angle) * 16.0
+	canvas.draw_line(marker, toe, HudTheme.YELLOW, 2.5)
+	var caption := "%+.0f° aim" % rad_to_deg(feedback_support_foot_angle)
+	canvas.draw_string(font, rect.position + Vector2(0.0, rect.size.y - 10.0), caption, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 11, HudTheme.TEXT_BODY)
+
+## Snapshot 4: ball contact point + follow-through swipe trace, same convention as
+## BallContactPanel (normalized -1..1 ball-local coordinates).
+func _draw_snapshot_contact(canvas: Control, rect: Rect2) -> void:
+	var center := _draw_snapshot_frame(canvas, rect, "CONTACT")
+	var font := canvas.get_theme_default_font()
+	var ball_radius := rect.size.y * 0.26
+	canvas.draw_circle(center, ball_radius, Color(1.0, 1.0, 1.0, 0.14))
+	canvas.draw_arc(center, ball_radius, 0.0, TAU, 48, HudTheme.CYAN_FRAME_SOFT, 1.5)
+	if feedback_swipe_points.size() == 0:
+		canvas.draw_string(font, center + Vector2(-50.0, 22.0), "DEFAULT", HORIZONTAL_ALIGNMENT_CENTER, 100.0, 12, HudTheme.TEXT_FAINT)
+		return
+	var first := center + feedback_swipe_points[0] * ball_radius
+	canvas.draw_circle(first, 5.0, HudTheme.YELLOW)
+	for i in range(1, feedback_swipe_points.size()):
+		var a := center + feedback_swipe_points[i - 1] * ball_radius
+		var b := center + feedback_swipe_points[i] * ball_radius
+		canvas.draw_line(a, b, HudTheme.YELLOW_WARN, 2.5)
+	if feedback_swipe_points.size() > 1:
+		var last := center + feedback_swipe_points[feedback_swipe_points.size() - 1] * ball_radius
+		canvas.draw_circle(last, 4.0, HudTheme.ORANGE_BRIGHT)
+	var caption := "contact %.0f%%, %.0f%%" % [feedback_impact_point.x * 100.0, feedback_impact_point.y * 100.0]
+	canvas.draw_string(font, rect.position + Vector2(0.0, rect.size.y - 10.0), caption, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 11, HudTheme.TEXT_BODY)
 
 ## Pops a result banner (goal, miss, save, post, crossbar). Deterministic tween, no RNG.
 func show_result_banner(text: String = "GOAL!", subtitle: String = "", highlight: Color = Color(0.0, 0.95, 1.0)) -> void:
@@ -762,6 +994,42 @@ func set_kicking_foot(foot: String) -> void:
 
 func _support_foot_for_kick(kicking_foot: String) -> String:
 	return "left" if kicking_foot == "right" else "right"
+
+func show_runup_ready() -> void:
+	hide_all()
+	_set_active_step(1)
+	set_phase_progress(0.0, "")
+	runup_has_marker = false
+	if runup_overlay != null:
+		runup_overlay.visible = true
+		runup_overlay.queue_redraw()
+	_show_primary_instruction("Run-up", "Tap beside the ball on your kicking foot's side and drag to set the run-up angle and distance.")
+	set_status("RUN-UP - tap beside the ball, drag, release to fix")
+
+func update_runup_gesture(angle_deg: float, distance_m: float, side: String, anchor_screen: Vector2, marker_screen: Vector2, arc: Vector2) -> void:
+	runup_angle_deg = angle_deg
+	runup_distance_m = distance_m
+	runup_side = side
+	runup_anchor_screen = anchor_screen
+	runup_marker_screen = marker_screen
+	runup_arc = arc
+	runup_has_marker = true
+	if runup_overlay != null:
+		runup_overlay.queue_redraw()
+	var distance_t := clampf(distance_m / ShotCalculator.RUNUP_DISTANCE_MAX_M, 0.0, 1.0)
+	var risk := "LOW" if distance_t < 0.4 else "MED" if distance_t < 0.75 else "HIGH"
+	feedback_label.text = "Run-up: %.0f deg (%s) - %s foot - %.1fm (%s risk)" % [angle_deg, _runup_style_label(angle_deg), side.to_upper(), distance_m, risk]
+	set_status("RUN-UP - release to fix")
+
+## Names the run-up style for player-facing feedback, mirroring real free-kick technique
+## (angle measured from the goal line: 0 = lateral, 90 = straight-on). A lateral run-up
+## favors curl/wrap; a straight-on run-up favors straight power/puntera.
+func _runup_style_label(angle_deg: float) -> String:
+	if angle_deg < 30.0:
+		return "WIDE/CURL"
+	if angle_deg < 60.0:
+		return "BALANCED"
+	return "STRAIGHT/POWER"
 
 func show_power_ready() -> void:
 	hide_all()

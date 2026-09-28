@@ -26,8 +26,8 @@ multiplayer. This is a mechanics-and-feel prototype for the kicking interaction 
 Set piece spawns (distance/wall/angle escalate)
         │
         ▼
-  Run-up  →  Power  →  Plant  →  Contact  →  [calculate]  →  Flight  →  Feedback recap
-   (Step 1)  (Step 2)  (Step 3)  (Step 4)                                     │
+  Run-up ⇢ Power  →  Plant  →  Contact  →  [calculate]  →  Flight  →  Feedback recap
+  (merged: release run-up starts the power auto-fill)  (Step 3)  (Step 4)   │
         ▲                                                                    │
         └──────────────── auto-restart after 4s (or on goal) ────────────────┘
 ```
@@ -53,54 +53,54 @@ act in time — steps 1 and 4 (run-up, and committing the final shot) are effect
 untimed/instant. This asymmetry (some steps punish hesitation, one doesn't) is worth a
 design pass — see §8.
 
-### Step 1 — Run-up (angle + distance)
+### Steps 1+2 — Run-up and Power (merged into one continuous flow)
 
-**Player action:** press-drag-release near the ball, before anything else. This is **opt-in**
-— a plain tap (no real drag) skips the mechanic entirely with no penalty and no bonus, as if
-it didn't exist.
+These two used to be separate gestures (drag to set run-up, release, then press-and-hold
+separately to charge power). They're now one continuous motion: the moment the run-up drag
+is released, the power bar **starts filling on its own** — no second press needed — and the
+player taps **once**, at any moment, to stop the bar and lock in that power value. There is
+no more hold-and-release for power; it's now a "stop the moving bar" mechanic.
 
-**What it captures:**
-- **Approach angle** (0–90°): dragging into a "lateral" direction (parallel to the goal line)
-  vs. a "straight-on" approach (perpendicular). This is grounded in real kicking-biomechanics
-  literature (cited in code comments) on how run-up angle trades power for hip-rotation room.
-  It **never steers the shot** — purely a technique trade-off:
-  - Lateral (0°) → full curl/spin ceiling later, but capped straight-line pace and a
-    softer power-hold curve (slower to build, wider forgiving window once it does).
-  - Straight-on (90°) → full top speed and a faster/more forgiving power charge, but the
-    Step 4 curl gesture's effect is capped at half strength no matter how well it's executed.
-- **Approach distance** (0–15m): a literal run-up length. Longer = a small launch-speed bonus
-  (up to +18% at max, tunable) but a **harsher power-hold timing window** in Step 2 (the
-  "sweet spot" narrows, so a long run-up rewards precise timing and punishes sloppy timing
-  more than a short one does).
-- **Which foot** is locked in by which side of the ball the player's first press lands on —
-  physical, not a menu toggle.
+**Run-up drag (opt-in):** press-drag-release near the ball, before anything else. A plain tap
+(no real drag) skips the mechanic entirely with no penalty and no bonus, as if it didn't
+exist. It captures:
+- **Approach angle** (0–90°): lateral (parallel to the goal line) vs. straight-on
+  (perpendicular), grounded in real kicking-biomechanics literature (cited in code comments).
+  It **never steers the shot** — purely a technique trade-off between the straight-power
+  ceiling and the curl ceiling (see below).
+- **Approach distance** (0–15m): a literal run-up length, which now shapes *how the auto-
+  filling power bar moves* (below) as well as giving a small launch-speed bonus (up to +18%
+  at max).
+- **Which foot** is locked in by which side of the ball the player's first press lands on.
 
-**Camera:** the near-ground "power view" camera pulls back live as the drag distance grows
-(capped at +3.5m beyond the base framing), so a longer run-up is visibly a longer run-up.
+**Power auto-fill:** the bar moves through the same four zones as before — LOW (0–40%) →
+CONTROL (40–70%) → IDEAL (70–85%) → RISK (85–100%) — but each zone's *speed* now depends on
+the committed run-up distance, layered on top of the existing stat/angle effects
+(`kick_power` still sets overall pace; accuracy/technique/composure still widen how long the
+IDEAL zone lasts; run-up angle still reshapes both the same way it always did). The distance
+effect reads as **momentum**:
 
-### Step 2 — Power (hold-to-charge)
+| Run-up distance | LOW | CONTROL | IDEAL | RISK/max |
+|---|---|---|---|---|
+| Short | slow | neutral | fast | fast |
+| Medium | fast | slow | neutral | fast |
+| Far | fast | fast | fast | slow |
 
-**Player action:** press and hold, release to lock in power. A saturating charge curve
-(`1 - e^(-t/τ)`), not linear — a well-timed release matters more than raw hold duration.
+A long run-up carries the bar quickly through low/control/ideal (you're already moving), but
+pushing past that natural pace into max power is the hard part (slow). A short run-up has a
+sluggish start with no momentum, but explodes through control/ideal/risk once moving. Medium
+sits in between, with only the control (build-up) zone feeling effortful.
 
-**What shapes the curve:**
-- `kick_power` stat shifts how fast the "ideal" zone arrives (a power player reaches it
-  sooner).
-- `accuracy + technique + composure` (averaged) shape how *wide/forgiving* that ideal zone
-  is.
-- Step 1's run-up angle and distance further reshape the curve on top of stats (see §3,
-  Step 1).
+Going past 85% ("overpowering") doesn't just risk a wild shot — it actively **shrinks the
+time budget** for the following plant/contact steps and **dampens curl** on the eventual
+strike, so it's a real, felt trade-off, not just a bigger error cone.
 
-**Power zones surfaced to the player** (color-coded meter): LOW (0–40%) → CONTROL (40–70%)
-→ IDEAL (70–85%) → RISK (85–100%). Going past 85% ("overpowering") doesn't just risk a wild
-shot — it actively **shrinks the time budget** for steps 2 and 3 afterward (narrower plant
-and contact windows) and **dampens curl** on the eventual strike, so it's a real, felt
-trade-off, not just a bigger error cone.
-
-**Camera:** frozen at wherever the run-up left it throughout the entire hold (no live
-movement while charging), then a one-shot "swoop" into the top-down Plant camera on release
-— **swoop speed scales with the power reached** (harder strike = snappier cut; soft strike =
-a more graceful move).
+**Camera:** pulls back live as the run-up drag distance grows (capped at +3.5m beyond the
+base framing), then stays **completely frozen** at that pulled-back pose for as long as the
+power bar is auto-filling — the camera never moves while you're deciding when to tap. The
+instant you tap to lock in power, a one-shot "swoop" carries the camera into the top-down
+Plant view, with **swoop speed scaling with the power reached** (harder strike = snappier
+cut; soft strike = a more graceful move).
 
 ### Step 3 — Plant (support-foot placement)
 
@@ -132,9 +132,9 @@ etc.) — the number was previously missing.
 ### Step 4 — Contact (the actual strike)
 
 **Player action:** tap a point on the ball, then drag a short follow-through trace, release
-to commit. Untimed within a ~2.8s window; the trace length available shrinks the harder Step
-2's power was charged (over-powering leaves less room to sweep a curl trace, nudging the
-result toward a straight/knuckle strike).
+to commit. Untimed within a ~2.8s window; the trace length available shrinks the higher the
+power reached (over-powering leaves less room to sweep a curl trace, nudging the result
+toward a straight/knuckle strike).
 
 **This is where technique is read from raw gesture shape**, classified deterministically
 into one of eight signatures:
@@ -219,12 +219,14 @@ so `weak_foot` is a meaningful stat, not a flavor number.
 `FreeKickDifficulty` is one exported resource controlling several distinct pressure levers,
 all currently tuned as a single global profile (no Easy/Medium/Hard variants yet):
 
-- **Step timers**: Step 2 (plant) 1.5s, Step 3 (contact) 2.8s baseline — both **shrink
-  further** the harder Step 2's power was charged (charging past 85% eats into your own
-  remaining time on the following steps).
-- **Timeout penalty**: any step that hits its timer (or Step 1's run-up, if engaged but
-  cut off — not applicable since Step 1 is untimed) stacks a penalty scaled by
-  `(1 - composure)` — a composed player is punished less for a rushed/missed step.
+- **Step timers**: Plant (Step 3) 1.5s, Contact (Step 4) 2.8s baseline — both **shrink
+  further** the higher the power reached (going past 85% eats into your own remaining time on
+  the following steps). Internally these are still named `step2_time_limit`/
+  `step3_time_limit` in `FreeKickDifficulty` — a naming leftover from before the run-up step
+  existed as its own phase; worth a rename pass if it ever causes confusion.
+- **Timeout penalty**: any step that hits its timer (run-up itself is untimed and can't) stacks
+  a penalty scaled by `(1 - composure)` — a composed player is punished less for a
+  rushed/missed step.
 - **Run-up trade-off knobs**: max speed bonus (18%) vs. max precision penalty (55%) at full
   run-up distance — currently symmetric-feeling but independently tunable.
 - **Set-piece escalation** (in `FreeKickSandbox`, not `FreeKickDifficulty`): distance
@@ -265,13 +267,15 @@ surface.
 
 ## 8. Open questions worth a principal-design pass
 
-- **Timer asymmetry**: Steps 2 and 3 punish hesitation with a hard timeout-and-default;
-  Steps 1 and 4 don't (Step 1 is untimed by design; Step 4's window is generous at 2.8s and
-  its "bad" outcome is just a weaker gesture read, not a full default). Is this the intended
-  tension curve, or should Step 4 carry real time pressure too?
+- **Timer asymmetry**: Plant (Step 3) punishes hesitation with a hard timeout-and-default;
+  Run-up and Contact (Step 4) don't (run-up is untimed by design; Contact's window is
+  generous at 2.8s and its "bad" outcome is just a weaker gesture read, not a full default;
+  Power no longer has a "sit and wait" option at all now that it auto-fills and a single tap
+  commits it). Is this the intended tension curve, or should Contact carry real time
+  pressure too?
 - **Run-up is fully opt-in with no downside for skipping** beyond forgoing its bonuses —
   is a zero-cost skip the intended framing, or should skipping it cost something (the way
-  timing out Steps 2/3 does)?
+  timing out Plant does)?
 - **Difficulty is a single global profile**; there's no Easy/Medium/Hard/Legendary split yet
   despite `guidance_level` existing as a stub field.
 - **No progression/meta-loop**: stats are fixed per pre-built profile; the `token_cost` /
@@ -282,6 +286,10 @@ surface.
 - **No audio, no full match context, no replay/highlight system, no multiplayer** — all
   explicitly out of scope for this prototype slice, listed here only so the reviewer knows
   they're absent by design-stage choice, not oversight.
+- **Accidental instant-tap risk**: since the power bar now starts moving the instant run-up
+  ends, a reflexive double-tap right after releasing run-up could lock in a near-0% strike.
+  Not addressed yet — worth playtesting before deciding whether a brief post-run-up input
+  grace window is needed.
 
 ---
 

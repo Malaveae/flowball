@@ -63,12 +63,18 @@ func _on_ball_body_entered(body: Node) -> void:
 		_finish_shot(_outcome_for_contact_body(body))
 
 func _is_feedback_contact_body(body: Node) -> bool:
+	# GoalNetCollision is deliberately excluded: touching the net is exactly what happens on
+	# a real goal (the ball flies through the goal mouth into the net right behind it), and
+	# GoalTrigger3D's Area3D separately - and racily - detects that same goal. Finishing the
+	# shot here on net contact could beat the trigger's `goal_scored` signal and misreport a
+	# genuine goal as a miss (outcome "net"). Letting the ball settle naturally (it gets
+	# slowed/captured by GoalTrigger3D.capture_in_net when it really is a goal) and finish via
+	# came_to_rest keeps FreeKickSandbox's current_spot_goal_scored guard authoritative.
 	var body_name := String(body.name)
 	return body_name == "TribunaBackground" \
 		or body_name == "GoalCollision" \
 		or body_name == "Goalkeeper" \
 		or body_name == "GoalkeeperCollision" \
-		or body_name == "GoalNetCollision" \
 		or body_name.begins_with("WallDummy")
 
 func _outcome_for_contact_body(body: Node) -> StringName:

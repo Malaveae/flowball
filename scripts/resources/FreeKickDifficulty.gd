@@ -1,8 +1,8 @@
 class_name FreeKickDifficulty
 extends Resource
 
-@export var step2_time_limit: float = 1.5  # TESTING: reduced from 3.0
-@export var step3_time_limit: float = 2.8
+@export var step2_time_limit: float = 2.0  # Plant
+@export var step3_time_limit: float = 1.5  # Contact
 @export var sector_size_multiplier: float = 1.0
 @export_range(0, 3, 1) var guidance_level: int = 1
 @export var default_penalty_scale: float = 1.0
@@ -13,6 +13,13 @@ extends Resource
 # Step 1 substep A: run-up angle/distance (tap-drag-release, fixed before the hold-for-power substep). Untimed.
 @export_range(0.0, 0.5, 0.01) var runup_power_bonus_max: float = 0.18 # launch-speed bonus at full run-up distance
 @export_range(0.0, 0.8, 0.01) var runup_precision_penalty_max: float = 0.55 # shrinks the step-1 power hold window at full run-up distance
+
+# Step 1+2 (merged): base seconds to traverse each power-bar zone (LOW/CONTROL/IDEAL/RISK)
+# before stat/run-up-distance speed multipliers are applied (see ShotCalculator.power_from_hold).
+@export var power_zone_low_seconds: float = 0.85
+@export var power_zone_control_seconds: float = 0.55
+@export var power_zone_ideal_seconds: float = 0.35
+@export var power_zone_risk_seconds: float = 0.55
 
 # Power pressure: charging past the ideal zone shrinks the step 2/3 time budget.
 @export_range(0.0, 1.0, 0.01) var time_penalty_threshold: float = 0.85  # keep in sync with ShotCalculator.IDEAL_POWER_MAX

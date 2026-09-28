@@ -16,6 +16,9 @@ extends MeshInstance3D
 ## Above the grass, below both the ball's underside (~0.05, from resting y=0.16 - radius 0.11)
 ## and FootballFieldMarkings3D.LINE_Y (0.062) - avoids z-fighting with either.
 @export var ground_y: float = 0.03
+## Dims the inactive half's wedge to this fraction of the active half's alpha, so the full
+## 180 degrees stays visible while the current foot's half reads as clearly highlighted.
+@export var inactive_alpha_scale: float = 0.35
 
 var _material: StandardMaterial3D
 
@@ -49,41 +52,11 @@ func update_gesture(angle_deg: float, distance_m: float, locked_foot: String, ba
 
 	var immediate := ImmediateMesh.new()
 
-	var fill_color := wedge_color
-	fill_color.a = wedge_fill_alpha
-	var rim_points: Array[Vector3] = []
-	for i in range(arc_segments + 1):
-		var t := float(i) / float(arc_segments)
-		var world_dir := _world_dir_for_angle_t(t, right, dir, lateral_sign)
-		rim_points.append(ball + world_dir * visual_radius_m)
-	immediate.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
-	for i in range(rim_points.size() - 1):
-		immediate.surface_set_color(fill_color)
-		immediate.surface_add_vertex(ball)
-		immediate.surface_set_color(fill_color)
-		immediate.surface_add_vertex(rim_points[i])
-		immediate.surface_set_color(fill_color)
-		immediate.surface_add_vertex(rim_points[i + 1])
-	immediate.surface_end()
-
-	var outline_color := wedge_color
-	outline_color.a = wedge_outline_alpha
-	immediate.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
-	for i in range(arc_segments + 1):
-		var t := float(i) / float(arc_segments)
-		var world_dir := _world_dir_for_angle_t(t, right, dir, lateral_sign)
-		immediate.surface_set_color(outline_color)
-		immediate.surface_add_vertex(ball + world_dir * visual_radius_m)
-	immediate.surface_end()
-
-	immediate.surface_begin(Mesh.PRIMITIVE_LINES)
-	for edge_t in [0.0, 1.0]:
-		var world_dir := _world_dir_for_angle_t(edge_t, right, dir, lateral_sign)
-		immediate.surface_set_color(outline_color)
-		immediate.surface_add_vertex(ball)
-		immediate.surface_set_color(outline_color)
-		immediate.surface_add_vertex(ball + world_dir * visual_radius_m)
-	immediate.surface_end()
+	# Always paint the FULL 180 degrees (both feet's halves), highlighting whichever half
+	# matches the currently-selected foot so the legal area and the live selection are both
+	# visible at once.
+	_add_half_wedge(immediate, ball, right, dir, 1.0, locked_foot == "left")
+	_add_half_wedge(immediate, ball, right, dir, -1.0, locked_foot == "right")
 
 	var distance_t := clampf(distance_m / ShotCalculator.RUNUP_DISTANCE_MAX_M, 0.0, 1.0)
 	var risk_color := HudTheme.CYAN_VALUE.lerp(HudTheme.ORANGE_BRIGHT, distance_t)
@@ -105,6 +78,42 @@ func update_gesture(angle_deg: float, distance_m: float, locked_foot: String, ba
 
 func _world_dir_for_angle_t(angle_t: float, right: Vector3, dir: Vector3, lateral_sign: float) -> Vector3:
 	return (right * lateral_sign * (1.0 - angle_t) + (-dir) * angle_t).normalized()
+
+## Paints one 90-degree half of the full 180 (lateral_sign=+1 is the left-foot half, -1 is
+## the right-foot half) as a fill + outline + edge lines, dimmed when it isn't the active half.
+func _add_half_wedge(immediate: ImmediateMesh, ball: Vector3, right: Vector3, dir: Vector3, lateral_sign: float, is_active: bool) -> void:
+	var alpha_scale := 1.0 if is_active else inactive_alpha_scale
+	var fill_color := wedge_color
+	fill_color.a = wedge_fill_alpha * alpha_scale
+	var outline_color := wedge_color
+	outline_color.a = wedge_outline_alpha * alpha_scale
+
+	var rim_points: Array[Vector3] = []
+	for i in range(arc_segments + 1):
+		var t := float(i) / float(arc_segments)
+		rim_points.append(ball + _world_dir_for_angle_t(t, right, dir, lateral_sign) * visual_radius_m)
+
+	immediate.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in range(rim_points.size() - 1):
+		immediate.surface_set_color(fill_color)
+		immediate.surface_add_vertex(ball)
+		immediate.surface_set_color(fill_color)
+		immediate.surface_add_vertex(rim_points[i])
+		immediate.surface_set_color(fill_color)
+		immediate.surface_add_vertex(rim_points[i + 1])
+	immediate.surface_end()
+
+	immediate.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
+	for p in rim_points:
+		immediate.surface_set_color(outline_color)
+		immediate.surface_add_vertex(p)
+	immediate.surface_end()
+
+	immediate.surface_begin(Mesh.PRIMITIVE_LINES)
+	for edge_point in [ball, rim_points[0], ball, rim_points[rim_points.size() - 1]]:
+		immediate.surface_set_color(outline_color)
+		immediate.surface_add_vertex(edge_point)
+	immediate.surface_end()
 
 func _append_disc(immediate: ImmediateMesh, center: Vector3, radius: float, color: Color, segments: int = 12) -> void:
 	immediate.surface_begin(Mesh.PRIMITIVE_TRIANGLES)

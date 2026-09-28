@@ -42,12 +42,41 @@ const RUNUP_POWER_CENTER_SCALE_AT_STRAIGHT_ANGLE := 0.85
 const RUNUP_POWER_SMOOTH_SCALE_AT_LATERAL_ANGLE := 0.75
 const RUNUP_POWER_SMOOTH_SCALE_AT_STRAIGHT_ANGLE := 1.25
 
-# Step 1 power curve (sigmoid). The ideal window width follows control stats;
-# the time to reach the ideal point follows kick_power.
-const POWER_CURVE_CENTER_MIN := 0.85  # max-power players: ideal reached fastest
-const POWER_CURVE_CENTER_MAX := 1.30  # low-power players: ideal reached slower
-const POWER_CURVE_SMOOTH_MIN := 0.12  # low-control: steep, tiny ideal window
-const POWER_CURVE_SMOOTH_MAX := 0.38  # high-control: wide ideal window
+# Step 1+2 (merged): the power bar auto-fills the instant run-up commits, walking through
+# four fixed zones (LOW/CONTROL/IDEAL/RISK, matching PowerMeterPanel's HUD colors) at a
+# per-zone rate. kick_power sets overall pace; the accuracy/technique/composure average
+# ("control") specifically stretches the IDEAL zone's duration (a more forgiving window to
+# release in, not a literal wider power range).
+const POWER_STAT_SPEED_MIN := 0.8    # low kick_power: slower overall pace
+const POWER_STAT_SPEED_MAX := 1.3    # high kick_power: faster overall pace
+const POWER_CONTROL_WIDEN_MIN := 0.6 # low control: less time to release in the ideal zone
+const POWER_CONTROL_WIDEN_MAX := 1.5 # high control: more time to release in the ideal zone
+
+# Run-up distance reshapes how fast the bar moves through each zone, continuously
+# interpolated across 3 reference points (short=0m, medium=7.5m, far=RUNUP_DISTANCE_MAX_M).
+# Reads as momentum: a long run-up carries you fast through low/control/ideal but pushing
+# past your natural pace into max power is the hard part; a short run-up has a sluggish
+# start but explodes through control/ideal/risk once moving. Each regime has exactly one
+# "slow" zone (0.5x) immediately followed by one "neutral" (1.0x) zone; everything else is
+# "fast" (1.6x).
+const RUNUP_ZONE_LOW_SHORT := 0.5
+const RUNUP_ZONE_LOW_MEDIUM := 1.6
+const RUNUP_ZONE_LOW_FAR := 1.6
+const RUNUP_ZONE_CONTROL_SHORT := 1.0
+const RUNUP_ZONE_CONTROL_MEDIUM := 0.5
+const RUNUP_ZONE_CONTROL_FAR := 1.6
+const RUNUP_ZONE_IDEAL_SHORT := 1.6
+const RUNUP_ZONE_IDEAL_MEDIUM := 1.0
+const RUNUP_ZONE_IDEAL_FAR := 1.6
+const RUNUP_ZONE_RISK_SHORT := 1.6
+const RUNUP_ZONE_RISK_MEDIUM := 1.6
+const RUNUP_ZONE_RISK_FAR := 0.5
+
+# Power-value bounds of the four HUD zones (must match PowerMeterPanel's LOW/CONTROL/IDEAL/RISK).
+const POWER_ZONE_LOW_WIDTH := 0.40
+const POWER_ZONE_CONTROL_WIDTH := 0.30
+const POWER_ZONE_IDEAL_WIDTH := 0.15
+const POWER_ZONE_RISK_WIDTH := 0.15
 
 static func calculate(
 	input: FreeKickInputData,
@@ -137,40 +166,65 @@ static func calculate(
 	params.shot_type = _classify_shot(params, swipe_vector)
 	return params
 
-## Step 1 hold curve: a sigmoid whose shape follows the player's stats.
-## - Smoothness (window width) scales with control (accuracy/technique/composure):
-##   a control player can land the ideal power more easily.
-## - Center (where the slope is steepest) scales with kick_power:
-##   a power player reaches the ideal point sooner, trading window for speed.
+## Step 1+2 (merged) hold curve: the power bar auto-fills through four fixed zones
+## (LOW/CONTROL/IDEAL/RISK). kick_power sets overall pace; control (accuracy/technique/
+## composure) stretches how long the IDEAL zone lasts (a more forgiving release window);
+## run-up angle (opt-in, as elsewhere) reshapes both the same way it always has; run-up
+## distance reshapes each zone's speed independently (see RUNUP_ZONE_* constants above).
 static func power_from_hold(hold_time: float, stats: PlayerFreeKickStats, runup_distance_m: float = 0.0, difficulty: FreeKickDifficulty = null, runup_angle_deg: float = 0.0, runup_engaged: bool = false) -> float:
 	if stats == null:
 		stats = PlayerFreeKickStats.new()
+	if difficulty == null:
+		difficulty = FreeKickDifficulty.new()
 	var control := (stats.normalized(stats.free_kick_accuracy)
 		+ stats.normalized(stats.technique)
 		+ stats.normalized(stats.composure)) / 3.0
 	var power_stat := stats.normalized(stats.kick_power)
-	var center := lerpf(POWER_CURVE_CENTER_MAX, POWER_CURVE_CENTER_MIN, power_stat)
-	var smooth := lerpf(POWER_CURVE_SMOOTH_MIN, POWER_CURVE_SMOOTH_MAX, control)
+	var speed := lerpf(POWER_STAT_SPEED_MIN, POWER_STAT_SPEED_MAX, power_stat)
+	var widen := lerpf(POWER_CONTROL_WIDEN_MIN, POWER_CONTROL_WIDEN_MAX, control)
 	# Run-up angle reshapes the curve itself: straight-on/power reaches the ideal point
 	# sooner and with a wider, more forgiving window; lateral/curl is slower to build up
 	# and then whips through a narrower window once it gets going. Opt-in, like the
 	# speed/spin ceilings in calculate().
 	if runup_engaged:
 		var runup_angle_t := clampf(runup_angle_deg, 0.0, RUNUP_ANGLE_MAX_DEG) / RUNUP_ANGLE_MAX_DEG
-		center *= lerpf(RUNUP_POWER_CENTER_SCALE_AT_LATERAL_ANGLE, RUNUP_POWER_CENTER_SCALE_AT_STRAIGHT_ANGLE, runup_angle_t)
-		smooth *= lerpf(RUNUP_POWER_SMOOTH_SCALE_AT_LATERAL_ANGLE, RUNUP_POWER_SMOOTH_SCALE_AT_STRAIGHT_ANGLE, runup_angle_t)
-	# Run-up distance (step 1 substep A) narrows the hold window: a longer run-up steepens
-	# the curve so the same release-timing error swings power further off target.
-	var runup_distance_t := clampf(runup_distance_m / RUNUP_DISTANCE_MAX_M, 0.0, 1.0)
-	var precision_penalty_max := 0.55 if difficulty == null else difficulty.runup_precision_penalty_max
-	smooth *= (1.0 - runup_distance_t * precision_penalty_max)
-	return _sigmoid_hold(hold_time, center, smooth)
+		speed /= lerpf(RUNUP_POWER_CENTER_SCALE_AT_LATERAL_ANGLE, RUNUP_POWER_CENTER_SCALE_AT_STRAIGHT_ANGLE, runup_angle_t)
+		widen *= lerpf(RUNUP_POWER_SMOOTH_SCALE_AT_LATERAL_ANGLE, RUNUP_POWER_SMOOTH_SCALE_AT_STRAIGHT_ANGLE, runup_angle_t)
+	var distance_t := clampf(runup_distance_m / RUNUP_DISTANCE_MAX_M, 0.0, 1.0)
+	var low_mult := _lerp3(RUNUP_ZONE_LOW_SHORT, RUNUP_ZONE_LOW_MEDIUM, RUNUP_ZONE_LOW_FAR, distance_t)
+	var control_mult := _lerp3(RUNUP_ZONE_CONTROL_SHORT, RUNUP_ZONE_CONTROL_MEDIUM, RUNUP_ZONE_CONTROL_FAR, distance_t)
+	var ideal_mult := _lerp3(RUNUP_ZONE_IDEAL_SHORT, RUNUP_ZONE_IDEAL_MEDIUM, RUNUP_ZONE_IDEAL_FAR, distance_t)
+	var risk_mult := _lerp3(RUNUP_ZONE_RISK_SHORT, RUNUP_ZONE_RISK_MEDIUM, RUNUP_ZONE_RISK_FAR, distance_t)
+	var low_dur := difficulty.power_zone_low_seconds / (speed * low_mult)
+	var control_dur := difficulty.power_zone_control_seconds / (speed * control_mult)
+	var ideal_dur := difficulty.power_zone_ideal_seconds * widen / (speed * ideal_mult)
+	var risk_dur := difficulty.power_zone_risk_seconds / (speed * risk_mult)
+	return _walk_power_zones(hold_time, [
+		Vector2(low_dur, POWER_ZONE_LOW_WIDTH),
+		Vector2(control_dur, POWER_ZONE_CONTROL_WIDTH),
+		Vector2(ideal_dur, POWER_ZONE_IDEAL_WIDTH),
+		Vector2(risk_dur, POWER_ZONE_RISK_WIDTH),
+	])
 
-static func _sigmoid_hold(t: float, t0: float, s: float) -> float:
-	# Normalized so power(0) = 0 and power(inf) = 1.
-	var sig_start := 1.0 / (1.0 + exp(t0 / s))
-	var sig_now := 1.0 / (1.0 + exp(-(t - t0) / s))
-	return clampf((sig_now - sig_start) / (1.0 - sig_start), 0.0, 1.0)
+## Walks hold_time through a sequence of (duration_seconds, power_width) zones, each
+## traversed at a constant rate, saturating at 1.0 once past the last zone.
+static func _walk_power_zones(hold_time: float, zones: Array) -> float:
+	var remaining := hold_time
+	var power_floor := 0.0
+	for zone in zones:
+		var duration: float = zone.x
+		var width: float = zone.y
+		if remaining < duration:
+			return clampf(power_floor + width * (remaining / maxf(duration, 0.0001)), 0.0, 1.0)
+		remaining -= duration
+		power_floor += width
+	return 1.0
+
+## Piecewise-lerps short->medium over t in [0, 0.5] and medium->far over t in [0.5, 1].
+static func _lerp3(short_value: float, medium_value: float, far_value: float, t: float) -> float:
+	if t <= 0.5:
+		return lerpf(short_value, medium_value, t * 2.0)
+	return lerpf(medium_value, far_value, (t - 0.5) * 2.0)
 
 static func _launch_speed(power: float, power_stat: float, distance: float, support_quality: float, step2_to_step3_ms: int = 0, runup_distance_m: float = 0.0, runup_power_bonus_max: float = 0.0, runup_angle_deg: float = 0.0, runup_engaged: bool = true) -> float:
 	var distance_bonus := clampf((distance - 18.0) / 22.0, 0.0, 0.25)

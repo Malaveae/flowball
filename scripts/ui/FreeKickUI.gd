@@ -980,8 +980,8 @@ func show_power_ready() -> void:
 	_set_active_step(1)
 	set_phase_progress(0.0, "")
 	_position_power_meter_for_foot()
-	_show_primary_instruction("Choose kicking foot", "Tap left or right side, then hold to charge power.")
-	set_status("POWER - choose kicking foot")
+	_show_primary_instruction("Power building", "Power is building on its own - tap to strike!")
+	set_status("POWER - building - tap to strike")
 
 func show_power(power_value: float) -> void:
 	_set_active_step(1)
@@ -990,9 +990,9 @@ func show_power(power_value: float) -> void:
 	power_label.visible = false
 	power_meter.visible = true
 	power_meter.power_value = power_value
-	_show_primary_instruction("Hold power", _power_feedback(power_value))
+	_show_primary_instruction("Tap to strike", _power_feedback(power_value))
 	power_label.text = "%d%%" % roundi(power_value * 100.0)
-	set_status("POWER - %s foot - release in the 70-85%% ideal zone" % kicking_foot.to_upper())
+	set_status("POWER - %s foot - tap in the 70-85%% ideal zone" % kicking_foot.to_upper())
 
 func show_support_foot_sector(selected_foot: String, _difficulty: FreeKickDifficulty) -> void:
 	hide_all()
@@ -1194,11 +1194,11 @@ func _show_primary_instruction(action: String, consequence: String) -> void:
 
 func _power_feedback(power_value: float) -> String:
 	if power_value < 0.40:
-		return "low — hold longer for distance"
+		return "low — let it build for more distance"
 	if power_value < 0.70:
-		return "controlled — keep charging toward ideal"
+		return "controlled — building toward ideal"
 	if power_value <= 0.85:
-		return "ideal window — release now"
+		return "ideal window — tap now"
 	return "risk — extra power reduces precision"
 
 func _apply_mvp_layout() -> void:
@@ -1212,7 +1212,10 @@ func _apply_mvp_layout() -> void:
 	power_bar.visible = false
 	power_bar.position = Vector2(24.0, 64.0)
 	power_bar.size = Vector2(260.0, 6.0)
-	power_meter.size = Vector2(150.0, 320.0)
+	# Real drawn content (labels+bar+boot) spans ~300px, not 150 - using the true width here
+	# keeps the mirrored left/right positioning math (see _position_power_meter_for_foot)
+	# actually centered on the visible graphic instead of an undersized assumed box.
+	power_meter.size = Vector2(310.0, 320.0)
 	power_meter.kicking_foot = kicking_foot
 	_position_power_meter_for_foot()
 	_place_anchored(feedback_label, Vector2(0.0, 0.0), Vector2(24.0, 60.0), Vector2(520.0, 58.0))

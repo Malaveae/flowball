@@ -40,7 +40,9 @@ func _init() -> void:
 	ok = _test_runup_angle_leaves_horizontal_aim_unchanged() and ok
 	ok = _test_runup_angle_trades_power_for_curl() and ok
 	ok = _test_runup_distance_boosts_launch_speed() and ok
-	ok = _test_runup_distance_narrows_power_precision() and ok
+	ok = _test_runup_distance_low_zone_speed() and ok
+	ok = _test_runup_distance_control_zone_speed() and ok
+	ok = _test_runup_distance_risk_zone_speed() and ok
 	ok = _test_runup_angle_reaches_ideal_power_sooner_when_straight() and ok
 	ok = _test_runup_angle_widens_power_window_when_straight() and ok
 	quit(0 if ok else 1)
@@ -588,13 +590,47 @@ func _test_runup_distance_boosts_launch_speed() -> bool:
 	_print_result("run-up distance boosts launch speed", passed)
 	return passed
 
-func _test_runup_distance_narrows_power_precision() -> bool:
+## Hold time needed to reach the given power level, with full run-up context (binary search).
+func _hold_time_for_power_runup(stats: PlayerFreeKickStats, difficulty: FreeKickDifficulty, runup_distance_m: float, target: float, runup_angle_deg: float = 0.0, runup_engaged: bool = true) -> float:
+	var low := 0.0
+	var high := 8.0
+	for _i in range(60):
+		var mid := (low + high) * 0.5
+		if ShotCalculator.power_from_hold(mid, stats, runup_distance_m, difficulty, runup_angle_deg, runup_engaged) < target:
+			low = mid
+		else:
+			high = mid
+	return (low + high) * 0.5
+
+func _test_runup_distance_low_zone_speed() -> bool:
+	# Short run-up is slow leaving the low zone (0-40%); far run-up is fast there.
 	var stats := _stats()
 	var difficulty := _difficulty()
-	var low_risk_swing := absf(ShotCalculator.power_from_hold(1.1, stats, 0.0, difficulty) - ShotCalculator.power_from_hold(0.9, stats, 0.0, difficulty))
-	var high_risk_swing := absf(ShotCalculator.power_from_hold(1.1, stats, ShotCalculator.RUNUP_DISTANCE_MAX_M, difficulty) - ShotCalculator.power_from_hold(0.9, stats, ShotCalculator.RUNUP_DISTANCE_MAX_M, difficulty))
-	var passed := high_risk_swing > low_risk_swing
-	_print_result("run-up distance narrows the power release precision window", passed)
+	var short_time := _hold_time_for_power_runup(stats, difficulty, 0.0, 0.40)
+	var far_time := _hold_time_for_power_runup(stats, difficulty, ShotCalculator.RUNUP_DISTANCE_MAX_M, 0.40)
+	var passed := short_time > far_time
+	_print_result("short run-up spends longer leaving the low zone than a far run-up", passed)
+	return passed
+
+func _test_runup_distance_control_zone_speed() -> bool:
+	# Medium run-up is slow through the control zone (40-70%); short and far are both fast there.
+	var stats := _stats()
+	var difficulty := _difficulty()
+	var short_dur := _hold_time_for_power_runup(stats, difficulty, 0.0, 0.70) - _hold_time_for_power_runup(stats, difficulty, 0.0, 0.40)
+	var medium_dur := _hold_time_for_power_runup(stats, difficulty, ShotCalculator.RUNUP_DISTANCE_MAX_M * 0.5, 0.70) - _hold_time_for_power_runup(stats, difficulty, ShotCalculator.RUNUP_DISTANCE_MAX_M * 0.5, 0.40)
+	var far_dur := _hold_time_for_power_runup(stats, difficulty, ShotCalculator.RUNUP_DISTANCE_MAX_M, 0.70) - _hold_time_for_power_runup(stats, difficulty, ShotCalculator.RUNUP_DISTANCE_MAX_M, 0.40)
+	var passed := medium_dur > short_dur and medium_dur > far_dur
+	_print_result("medium run-up spends longer in the control zone than short or far", passed)
+	return passed
+
+func _test_runup_distance_risk_zone_speed() -> bool:
+	# Far run-up is slow through the risk zone (85-100%); short is fast there.
+	var stats := _stats()
+	var difficulty := _difficulty()
+	var short_dur := _hold_time_for_power_runup(stats, difficulty, 0.0, 1.0) - _hold_time_for_power_runup(stats, difficulty, 0.0, 0.85)
+	var far_dur := _hold_time_for_power_runup(stats, difficulty, ShotCalculator.RUNUP_DISTANCE_MAX_M, 1.0) - _hold_time_for_power_runup(stats, difficulty, ShotCalculator.RUNUP_DISTANCE_MAX_M, 0.85)
+	var passed := far_dur > short_dur
+	_print_result("far run-up spends longer in the risk zone than a short run-up", passed)
 	return passed
 
 func _test_runup_angle_reaches_ideal_power_sooner_when_straight() -> bool:
@@ -609,24 +645,15 @@ func _test_runup_angle_reaches_ideal_power_sooner_when_straight() -> bool:
 	return passed
 
 func _test_runup_angle_widens_power_window_when_straight() -> bool:
-	# Compare the power swing over the same +/-0.1s window centered on each angle's OWN
-	# curve center - isolates the smooth/window-width effect from the center-timing shift.
-	var power_stat := 0.75 # matches _stats(): kick_power=75 normalized
-	var control := 0.75    # matches _stats(): accuracy/technique/composure=75 normalized
-	var base_center := lerpf(ShotCalculator.POWER_CURVE_CENTER_MAX, ShotCalculator.POWER_CURVE_CENTER_MIN, power_stat)
-	var straight_center := base_center * ShotCalculator.RUNUP_POWER_CENTER_SCALE_AT_STRAIGHT_ANGLE
-	var lateral_center := base_center * ShotCalculator.RUNUP_POWER_CENTER_SCALE_AT_LATERAL_ANGLE
+	# Straight-on run-up should spend longer in the ideal zone (70-85%, more forgiving) than
+	# a lateral run-up - same measurement style as the control-stat window comparison.
 	var stats := _stats()
 	var difficulty := _difficulty()
-	var straight_swing := absf(
-		ShotCalculator.power_from_hold(straight_center + 0.1, stats, 0.0, difficulty, ShotCalculator.RUNUP_ANGLE_MAX_DEG, true)
-		- ShotCalculator.power_from_hold(straight_center - 0.1, stats, 0.0, difficulty, ShotCalculator.RUNUP_ANGLE_MAX_DEG, true)
-	)
-	var lateral_swing := absf(
-		ShotCalculator.power_from_hold(lateral_center + 0.1, stats, 0.0, difficulty, 0.0, true)
-		- ShotCalculator.power_from_hold(lateral_center - 0.1, stats, 0.0, difficulty, 0.0, true)
-	)
-	var passed := straight_swing < lateral_swing
+	var straight_window := _hold_time_for_power_runup(stats, difficulty, 0.0, 0.85, ShotCalculator.RUNUP_ANGLE_MAX_DEG, true) \
+		- _hold_time_for_power_runup(stats, difficulty, 0.0, 0.70, ShotCalculator.RUNUP_ANGLE_MAX_DEG, true)
+	var lateral_window := _hold_time_for_power_runup(stats, difficulty, 0.0, 0.85, 0.0, true) \
+		- _hold_time_for_power_runup(stats, difficulty, 0.0, 0.70, 0.0, true)
+	var passed := straight_window > lateral_window
 	_print_result("straight-on run-up widens the power window (more forgiving) than a lateral run-up", passed)
 	return passed
 

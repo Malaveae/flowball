@@ -28,6 +28,7 @@ var runup_distance_m := 0.0
 var locked_foot := "right"
 var _gesture_active := false
 var _gesture_index := -1
+var _mouse_captured := false
 
 ## Screen-space drag magnitude that maps to a full run-up distance (ShotCalculator.RUNUP_DISTANCE_MAX_M).
 const MAX_DRAG_PX := 220.0
@@ -49,8 +50,19 @@ func enter(_controller: FreeKickController) -> void:
 	locked_foot = "right"
 	_gesture_active = false
 	_gesture_index = -1
+	_mouse_captured = false
 	controller.camera_rig.set_mode(&"POWER_VIEW")
+	controller.camera_rig.start_runup_tracking()
 	controller.ui.show_runup_ready()
+	var ball := controller.get_ball()
+	controller.runup_ground_marker.show_ready(ball.global_position if ball != null else Vector3.ZERO, controller.camera_rig.goal_position)
+
+func exit() -> void:
+	super.exit()
+	if _mouse_captured:
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+		_mouse_captured = false
+	controller.runup_ground_marker.hide_marker()
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
@@ -62,15 +74,22 @@ func _input(event: InputEvent) -> void:
 		_drag_to(event.position)
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
-			_begin_gesture(0, event.position)
+			_begin_gesture(0, event.position, true)
 		elif _gesture_active:
 			_end_gesture()
 	elif event is InputEventMouseMotion and _gesture_active:
-		_drag_to(event.position)
+		if _mouse_captured:
+			_drag_by(event.relative)
+		else:
+			_drag_to(event.position)
 
 ## Press: anchor the gesture. Which side of the ball's screen position the anchor lands
 ## on locks the kicking foot (a fresh press elsewhere re-locks it, canceling the earlier one).
-func _begin_gesture(index: int, screen_pos: Vector2) -> void:
+## Mouse presses capture the cursor so the drag is measured in unbounded relative motion
+## instead of absolute screen position - otherwise some angles (e.g. a diagonal drag toward
+## the bottom of the window, under POWER_VIEW's low ball framing) could hit the screen edge
+## before reaching the full MAX_DRAG_PX, capping distance below max at those angles.
+func _begin_gesture(index: int, screen_pos: Vector2, is_mouse: bool = false) -> void:
 	_gesture_index = index
 	_gesture_active = true
 	has_marker = true
@@ -79,6 +98,9 @@ func _begin_gesture(index: int, screen_pos: Vector2) -> void:
 	locked_foot = "right" if screen_pos.x < _ball_screen_x() else "left"
 	controller.input_data.selected_foot = locked_foot
 	controller.ui.set_kicking_foot(locked_foot)
+	_mouse_captured = is_mouse
+	if is_mouse:
+		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	_update_from_drag()
 	get_viewport().set_input_as_handled()
 
@@ -86,6 +108,13 @@ func _drag_to(screen_pos: Vector2) -> void:
 	if not has_marker:
 		return
 	marker_screen = screen_pos
+	_update_from_drag()
+	get_viewport().set_input_as_handled()
+
+func _drag_by(relative: Vector2) -> void:
+	if not has_marker:
+		return
+	marker_screen += relative
 	_update_from_drag()
 	get_viewport().set_input_as_handled()
 
@@ -105,6 +134,10 @@ func _update_from_drag() -> void:
 	var distance_t := clampf(drag.length() / MAX_DRAG_PX, 0.0, 1.0)
 	runup_distance_m = distance_t * ShotCalculator.RUNUP_DISTANCE_MAX_M
 	controller.ui.update_runup_gesture(runup_angle_deg, runup_distance_m, locked_foot, anchor_screen, marker_screen, arc)
+	controller.camera_rig.set_runup_distance(runup_distance_m)
+	var ball := controller.get_ball()
+	if ball != null:
+		controller.runup_ground_marker.update_gesture(runup_angle_deg, runup_distance_m, locked_foot, ball.global_position, controller.camera_rig.goal_position)
 
 func _ball_screen_x() -> float:
 	var ball := controller.get_ball()
@@ -117,6 +150,9 @@ func _ball_screen_x() -> float:
 func _end_gesture() -> void:
 	_gesture_active = false
 	_gesture_index = -1
+	if _mouse_captured:
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+		_mouse_captured = false
 	_commit(runup_distance_m < ENGAGEMENT_DEADZONE_M)
 
 func _commit(use_default: bool) -> void:
@@ -132,4 +168,5 @@ func _commit(use_default: bool) -> void:
 		controller.input_data.runup_distance_m = runup_distance_m
 		controller.input_data.selected_foot = locked_foot
 		controller.input_data.used_default_runup = false
+	controller.runup_ground_marker.hide_marker()
 	finished.emit(&"PowerState")

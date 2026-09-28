@@ -66,6 +66,7 @@ func _support_feedback(input_data: FreeKickInputData) -> String:
 	var expected_side := "left" if input_data.selected_foot == "right" else "right"
 	var actual_side := "left" if input_data.support_vector.x < 0.0 else "right" if input_data.support_vector.x > 0.0 else "center"
 	var side_note := "plant side OK" if actual_side == expected_side else "plant side corrected to %s" % expected_side
+	var distance_note := "%.0fcm from ball" % (absf(input_data.support_vector.x) * 100.0)
 	var depth_note := "balanced plant"
 	if input_data.plant_depth < -0.25:
 		depth_note = "ahead/open plant: easier curl, less drive"
@@ -81,7 +82,7 @@ func _support_feedback(input_data: FreeKickInputData) -> String:
 		quality_note = "poor anchor: less power/control"
 	elif input_data.support_quality < 0.72:
 		quality_note = "risky anchor"
-	return "%s - %s - %s - %s" % [side_note, depth_note, angle_note, quality_note]
+	return "%s - %s - %s - %s - %s" % [side_note, distance_note, depth_note, angle_note, quality_note]
 
 func _coach_tip(input_data: FreeKickInputData, params: ShotParams, report: FreeKickFeedbackReport) -> String:
 	if input_data.used_default_support or input_data.used_default_contact:

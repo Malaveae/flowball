@@ -28,6 +28,7 @@ var step3_time_limit_effective: float = -1.0  # set at PowerState release; power
 @onready var camera_rig: FreeKickCameraRig = $FreeKickCameraRig
 @onready var shot_observer: ShotObserver = $ShotObserver
 @onready var trajectory_ghost: TrajectoryGhost3D = $TrajectoryGhost3D
+@onready var runup_ground_marker: RunUpGroundMarker3D = $RunUpGroundMarker3D
 
 func _ready() -> void:
 	if stats == null:

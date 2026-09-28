@@ -31,8 +31,13 @@ func _input(event: InputEvent) -> void:
 		controller.input_data.hold_time = hold_time
 		controller.input_data.power_normalized = ShotCalculator.power_from_hold(hold_time, controller.stats, controller.input_data.runup_distance_m, controller.difficulty, controller.input_data.runup_angle_deg, not controller.input_data.used_default_runup)
 		controller.set_power_time_budget(controller.input_data.power_normalized)
+		controller.camera_rig.swoop_to_plant_view(controller.input_data.power_normalized)
 		finished.emit(&"SupportFootState")
 		get_viewport().set_input_as_handled()
+
+func exit() -> void:
+	super.exit()
+	controller.camera_rig.stop_runup_tracking()
 
 func _is_power_press(event: InputEvent) -> bool:
 	return event.is_action_pressed("free_kick_power") or _is_primary_touch_press(event) or _is_primary_mouse_press(event)

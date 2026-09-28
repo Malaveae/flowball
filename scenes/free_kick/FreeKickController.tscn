@@ -1,4 +1,4 @@
-[gd_scene load_steps=20 format=3]
+[gd_scene load_steps=21 format=3]
 
 [ext_resource type="Script" path="res://scripts/state_machine/FreeKickController.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/state_machine/FreeKickStateMachine.gd" id="2"]
@@ -16,6 +16,7 @@
 [ext_resource type="Script" path="res://scripts/ui/SupportPlantPanel.gd" id="13"]
 [ext_resource type="Script" path="res://scripts/ui/BallContactPanel.gd" id="14"]
 [ext_resource type="Script" path="res://scripts/ui/PowerMeterPanel.gd" id="15"]
+[ext_resource type="Script" path="res://scripts/telemetry/RunUpGroundMarker3D.gd" id="17"]
 
 [node name="FreeKickController" type="Node"]
 script = ExtResource("1")
@@ -179,3 +180,6 @@ script = ExtResource("11")
 
 [node name="TrajectoryGhost3D" type="MeshInstance3D" parent="."]
 script = ExtResource("12")
+
+[node name="RunUpGroundMarker3D" type="MeshInstance3D" parent="."]
+script = ExtResource("17")

@@ -8,11 +8,6 @@ const WIND_HUD_MARGIN := Vector2(24.0, 24.0)
 const DIST_HUD_SIZE := Vector2(148.0, 68.0)
 const DIST_HUD_MARGIN := Vector2(24.0, 24.0)
 
-## Mirrors RunUpState.MAX_DRAG_PX - duplicated locally so this file doesn't depend on
-## RunUpState's global class_name being registered yet (headless script runs can hit a
-## class-cache miss on a brand-new class_name referenced from another script).
-const RUNUP_MAX_DRAG_PX := 220.0
-
 # Post-shot feedback recap: 4 frozen mini-diagrams (run-up, power, plant, contact).
 const FEEDBACK_SNAPSHOT_WIDTH := 150.0
 const FEEDBACK_SNAPSHOT_GAP := 14.0
@@ -295,7 +290,6 @@ class DistAngleHud extends Control:
 var kicking_foot := "right"
 var support_marker_hint: Control
 var support_zone_overlay: Control
-var runup_overlay: Control
 var runup_anchor_screen := Vector2.ZERO
 var runup_marker_screen := Vector2.ZERO
 var runup_arc := Vector2(180.0, 270.0) # degrees clockwise from 12 o'clock, locked foot's valid arc
@@ -344,7 +338,6 @@ func _ready() -> void:
 	result_card = _create_result_card()
 	left_support_boot_texture = LEFT_SUPPORT_BOOT_TEXTURE
 	support_zone_overlay = _create_support_zone_overlay()
-	runup_overlay = _create_runup_overlay()
 	support_marker_hint = _create_support_marker_hint()
 	goal_banner = _create_goal_banner()
 	wind_module = _create_wind_module()
@@ -493,8 +486,6 @@ func hide_all() -> void:
 		support_marker_hint.visible = false
 	if support_zone_overlay != null:
 		support_zone_overlay.visible = false
-	if runup_overlay != null:
-		runup_overlay.visible = false
 	if feedback_snapshots_overlay != null:
 		feedback_snapshots_overlay.visible = false
 
@@ -570,48 +561,6 @@ func _create_support_zone_overlay() -> Control:
 				overlay.draw_arc(marker, 24.0, 0.0, TAU, 32, Color(0.3, 1.0, 0.45, 0.8 * support_zone_flash), 3.0)
 		var side_text := "LEFT" if kicking_foot == "right" else "RIGHT"
 		overlay.draw_string(overlay.get_theme_default_font(), center + Vector2(-96.0, radius + 28.0), "Plant zone: %s side - slide to aim" % side_text, HORIZONTAL_ALIGNMENT_CENTER, 192.0, 13, Color(1, 1, 1, 0.7))
-	)
-	if root != null:
-		root.add_child(overlay)
-	else:
-		add_child(overlay)
-	return overlay
-
-func _create_runup_overlay() -> Control:
-	var root := get_node_or_null("Root") as Control
-	var overlay := Control.new()
-	overlay.name = "RunUpOverlay"
-	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.visible = false
-	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	overlay.draw.connect(func() -> void:
-		if not runup_has_marker:
-			return
-		var center := runup_anchor_screen
-		var max_radius := RUNUP_MAX_DRAG_PX
-		overlay.draw_arc(center, max_radius, 0.0, TAU, 64, Color(1, 1, 1, 0.12), 1.5)
-		# Valid arc wedge for the locked foot - the only area the drag can actually land in.
-		var arc_start_rad := deg_to_rad(runup_arc.x - 90.0)
-		var arc_end_rad := deg_to_rad(runup_arc.y - 90.0)
-		var wedge_points := PackedVector2Array([center])
-		var steps := 20
-		for i in range(steps + 1):
-			var t := lerpf(arc_start_rad, arc_end_rad, float(i) / float(steps))
-			wedge_points.append(center + Vector2(cos(t), sin(t)) * max_radius)
-		var wedge_color := HudTheme.GREEN_SUCCESS
-		wedge_color.a = 0.10
-		overlay.draw_colored_polygon(wedge_points, wedge_color)
-		overlay.draw_arc(center, max_radius, arc_start_rad, arc_end_rad, steps, HudTheme.GREEN_SUCCESS, 2.0)
-		overlay.draw_line(center, center + Vector2(cos(arc_start_rad), sin(arc_start_rad)) * max_radius, HudTheme.GREEN_SUCCESS, 1.5)
-		overlay.draw_line(center, center + Vector2(cos(arc_end_rad), sin(arc_end_rad)) * max_radius, HudTheme.GREEN_SUCCESS, 1.5)
-		# Marker: risk color ramps toward orange as run-up distance grows.
-		var distance_t := clampf(runup_distance_m / ShotCalculator.RUNUP_DISTANCE_MAX_M, 0.0, 1.0)
-		var risk_color := HudTheme.CYAN_VALUE.lerp(HudTheme.ORANGE_BRIGHT, distance_t)
-		overlay.draw_line(center, runup_marker_screen, risk_color, 3.0)
-		overlay.draw_circle(runup_marker_screen, 8.0, risk_color)
-		overlay.draw_circle(center, 5.0, Color(1, 1, 1, 0.6))
-		var readout := "%.0f deg (%s) - %s foot - %.1fm" % [runup_angle_deg, _runup_style_label(runup_angle_deg), runup_side.to_upper(), runup_distance_m]
-		overlay.draw_string(overlay.get_theme_default_font(), center + Vector2(-110.0, max_radius + 30.0), readout, HORIZONTAL_ALIGNMENT_CENTER, 220.0, 12, Color(1, 1, 1, 0.75))
 	)
 	if root != null:
 		root.add_child(overlay)
@@ -820,7 +769,7 @@ func _draw_snapshot_support(canvas: Control, rect: Rect2) -> void:
 	canvas.draw_circle(marker, 6.0, HudTheme.GREEN_SUCCESS)
 	var toe := marker + Vector2.from_angle(feedback_support_foot_angle) * 16.0
 	canvas.draw_line(marker, toe, HudTheme.YELLOW, 2.5)
-	var caption := "%+.0f° aim" % rad_to_deg(feedback_support_foot_angle)
+	var caption := "%+.0f° aim · %.0fcm" % [rad_to_deg(feedback_support_foot_angle), absf(feedback_support_vector.x) * 100.0]
 	canvas.draw_string(font, rect.position + Vector2(0.0, rect.size.y - 10.0), caption, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 11, HudTheme.TEXT_BODY)
 
 ## Snapshot 4: ball contact point + follow-through swipe trace, same convention as
@@ -1000,9 +949,6 @@ func show_runup_ready() -> void:
 	_set_active_step(1)
 	set_phase_progress(0.0, "")
 	runup_has_marker = false
-	if runup_overlay != null:
-		runup_overlay.visible = true
-		runup_overlay.queue_redraw()
 	_show_primary_instruction("Run-up", "Tap beside the ball on your kicking foot's side and drag to set the run-up angle and distance.")
 	set_status("RUN-UP - tap beside the ball, drag, release to fix")
 
@@ -1014,8 +960,6 @@ func update_runup_gesture(angle_deg: float, distance_m: float, side: String, anc
 	runup_marker_screen = marker_screen
 	runup_arc = arc
 	runup_has_marker = true
-	if runup_overlay != null:
-		runup_overlay.queue_redraw()
 	var distance_t := clampf(distance_m / ShotCalculator.RUNUP_DISTANCE_MAX_M, 0.0, 1.0)
 	var risk := "LOW" if distance_t < 0.4 else "MED" if distance_t < 0.75 else "HIGH"
 	feedback_label.text = "Run-up: %.0f deg (%s) - %s foot - %.1fm (%s risk)" % [angle_deg, _runup_style_label(angle_deg), side.to_upper(), distance_m, risk]

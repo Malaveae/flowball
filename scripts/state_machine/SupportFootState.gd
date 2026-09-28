@@ -35,7 +35,11 @@ func enter(_controller: FreeKickController) -> void:
 	aim_target = 0.0
 	_gesture_active = false
 	_gesture_index = -1
-	controller.camera_rig.set_mode(&"SUPPORT_TOP_DOWN")
+	# PowerState's release handler already started a custom-duration swoop into this same
+	# mode (see FreeKickCameraRig.swoop_to_plant_view) - don't cut it short with a fresh
+	# fixed-duration tween to the same destination.
+	if controller.camera_rig.mode != &"SUPPORT_TOP_DOWN":
+		controller.camera_rig.set_mode(&"SUPPORT_TOP_DOWN")
 	controller.ui.show_support_foot_sector(controller.input_data.selected_foot, controller.difficulty)
 	controller.ui.update_support_marker(Vector2(-radius * 0.55 if controller.input_data.selected_foot == "right" else radius * 0.55, 0.0))
 

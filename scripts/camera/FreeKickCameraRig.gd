@@ -23,12 +23,22 @@ signal mode_changed(mode: StringName)
 # Keep gameplay cameras inside the stadium bowl so side/end stands do not occlude the shot.
 @export var camera_bounds_min: Vector3 = Vector3(-32.0, 0.0, -51.0)
 @export var camera_bounds_max: Vector3 = Vector3(32.0, 20.0, 51.0)
+# POWER_VIEW pulls back by up to this much (on top of the base 2.0m) as RunUpState's live
+# drag distance approaches ShotCalculator.RUNUP_DISTANCE_MAX_M - capped/modest by design.
+@export var runup_pullback_max_m := 3.5
+# One-shot swoop into SUPPORT_TOP_DOWN on power release (see swoop_to_plant_view): duration
+# scales with the power reached, faster at max power, slower at zero power.
+@export var runup_swoop_duration_min := 0.35
+@export var runup_swoop_duration_max := 1.1
 
 var mode: StringName = &"MATCH_VIEW"
 var _tween: Tween
 
 const SHOT_FOLLOW_RATE := 6.0  # 1/s lerp rate toward target transform
+const RUNUP_TRACK_RATE := 6.0
 var _follow_active := false
+var _runup_tracking_active := false
+var _runup_distance_m := 0.0
 
 func tracking_active() -> bool:
 	return _follow_active
@@ -36,22 +46,62 @@ func tracking_active() -> bool:
 func set_mode(next_mode: StringName) -> void:
 	mode = next_mode
 	_follow_active = next_mode == &"SHOT_FOLLOW"
-	process_mode = Node.PROCESS_MODE_ALWAYS if _follow_active else Node.PROCESS_MODE_INHERIT
+	_update_process_mode()
 	var camera := get_camera()
 	if camera != null:
 		_apply_camera_transform(camera, _transform_for_mode(next_mode), _fov_for_mode(next_mode))
 	mode_changed.emit(mode)
 
-func _process(delta: float) -> void:
-	if not _follow_active or mode != &"SHOT_FOLLOW":
-		return
+## Live camera tracking for RunUpState's drag gesture: the camera eases back as
+## _runup_distance_m grows, instead of only being set once on mode entry.
+func start_runup_tracking() -> void:
+	_runup_tracking_active = true
+	_runup_distance_m = 0.0
+	_update_process_mode()
+
+func stop_runup_tracking() -> void:
+	_runup_tracking_active = false
+	_runup_distance_m = 0.0
+	_update_process_mode()
+
+func set_runup_distance(distance_m: float) -> void:
+	_runup_distance_m = distance_m
+
+## One-shot camera move from wherever it is (the frozen run-up/POWER_VIEW pose) into the
+## Plant step's top-down view, triggered on power release. Swoop speed scales with the power
+## reached - higher power = faster/snappier, lower power = slower/more graceful - but the
+## destination is always exactly SUPPORT_TOP_DOWN's transform, never partial.
+func swoop_to_plant_view(power_t: float) -> void:
+	_runup_tracking_active = false
+	_update_process_mode()
+	mode = &"SUPPORT_TOP_DOWN"
 	var camera := get_camera()
 	if camera == null:
 		return
-	var target := _shot_follow_transform()
-	var weight := 1.0 - exp(-SHOT_FOLLOW_RATE * delta)
-	camera.global_transform = camera.global_transform.interpolate_with(target, weight)
-	camera.fov = lerpf(camera.fov, shot_follow_fov, weight)
+	var duration := lerpf(runup_swoop_duration_max, runup_swoop_duration_min, clampf(power_t, 0.0, 1.0))
+	_apply_camera_transform(camera, _support_top_down_transform(), _fov_for_mode(&"SUPPORT_TOP_DOWN"), duration)
+	mode_changed.emit(mode)
+
+func _update_process_mode() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS if (_follow_active or _runup_tracking_active) else Node.PROCESS_MODE_INHERIT
+
+func _process(delta: float) -> void:
+	if _follow_active and mode == &"SHOT_FOLLOW":
+		var camera := get_camera()
+		if camera == null:
+			return
+		var target := _shot_follow_transform()
+		var weight := 1.0 - exp(-SHOT_FOLLOW_RATE * delta)
+		camera.global_transform = camera.global_transform.interpolate_with(target, weight)
+		camera.fov = lerpf(camera.fov, shot_follow_fov, weight)
+		return
+	if _runup_tracking_active and mode == &"POWER_VIEW":
+		var camera := get_camera()
+		if camera == null:
+			return
+		var target := _goal_centered_transform(&"POWER_VIEW")
+		var weight := 1.0 - exp(-RUNUP_TRACK_RATE * delta)
+		camera.global_transform = camera.global_transform.interpolate_with(target, weight)
 
 ## Live shot-follow target computed from the ball's CURRENT position, not the launch-time snapshot.
 func _shot_follow_transform() -> Transform3D:
@@ -71,15 +121,16 @@ func _shot_follow_transform() -> Transform3D:
 func get_camera() -> Camera3D:
 	return get_node_or_null(camera_path) as Camera3D
 
-func _apply_camera_transform(camera: Camera3D, target: Transform3D, target_fov: float) -> void:
+func _apply_camera_transform(camera: Camera3D, target: Transform3D, target_fov: float, duration: float = -1.0) -> void:
 	camera.current = true
 	if _tween != null:
 		_tween.kill()
+	var actual_duration := blend_time if duration < 0.0 else duration
 	_tween = create_tween()
 	_tween.set_parallel(true)
 	_tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_tween.tween_property(camera, "global_transform", target, blend_time)
-	_tween.tween_property(camera, "fov", target_fov, blend_time)
+	_tween.tween_property(camera, "global_transform", target, actual_duration)
+	_tween.tween_property(camera, "fov", target_fov, actual_duration)
 
 func _transform_for_mode(next_mode: StringName) -> Transform3D:
 	if next_mode == &"BALL_CONTACT_UI":
@@ -106,8 +157,10 @@ func _goal_centered_transform(next_mode: StringName) -> Transform3D:
 	match next_mode:
 		&"POWER_VIEW":
 			# Initial free-kick view: near player-eye perspective, about two meters behind the ball.
+			# Pulls back further, live, as RunUpState's drag distance grows (see set_runup_distance).
 			height = 1.65
-			behind = 2.0
+			var pullback_t := clampf(_runup_distance_m / ShotCalculator.RUNUP_DISTANCE_MAX_M, 0.0, 1.0)
+			behind = 2.0 + pullback_t * runup_pullback_max_m
 			look_height = 0.45
 		&"SUPPORT_TOP_DOWN":
 			height = 8.0

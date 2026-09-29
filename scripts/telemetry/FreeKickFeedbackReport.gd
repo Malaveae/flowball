@@ -14,3 +14,4 @@ extends Resource
 @export var coach_tip: String = ""
 @export var peak_height: float = 0.0
 @export var total_flight_time: float = 0.0
+@export var knuckle_gain: float = 0.0

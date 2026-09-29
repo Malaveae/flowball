@@ -16,6 +16,7 @@ func start_recording(target_ball: FreeKickBall3D, params: ShotParams) -> void:
 	shot_params = params
 	telemetry = BallFlightTelemetry.new()
 	telemetry.sample_interval = sample_interval
+	telemetry.knuckle_gain = params.knuckle_gain if params != null else 0.0
 	recording = true
 	_accum = 0.0
 	_elapsed = 0.0
@@ -24,7 +25,10 @@ func start_recording(target_ball: FreeKickBall3D, params: ShotParams) -> void:
 
 func record_sample_now() -> void:
 	if recording and ball != null and telemetry != null:
-		telemetry.add_sample(ball.global_position, ball.linear_velocity)
+		telemetry.add_sample(ball.global_position, ball.linear_velocity, _knuckle_offset())
+
+func _knuckle_offset() -> Vector3:
+	return ball.aerodynamics.knuckle_offset if ball.aerodynamics != null else Vector3.ZERO
 
 func stop_recording(outcome: StringName) -> void:
 	_outcome = outcome
@@ -41,7 +45,7 @@ func _process(delta: float) -> void:
 	_accum += delta
 	if _accum >= sample_interval:
 		_accum = 0.0
-		telemetry.add_sample(ball.global_position, ball.linear_velocity)
+		telemetry.add_sample(ball.global_position, ball.linear_velocity, _knuckle_offset())
 
 func build_report(_input_data: FreeKickInputData) -> FreeKickFeedbackReport:
 	var report := FreeKickFeedbackReport.new()
@@ -51,6 +55,7 @@ func build_report(_input_data: FreeKickInputData) -> FreeKickFeedbackReport:
 		report.spin_rate = shot_params.spin_rate
 		report.elevation_angle = shot_params.elevation_angle
 		report.horizontal_angle = shot_params.horizontal_angle
+		report.knuckle_gain = shot_params.knuckle_gain
 		report.curl_direction = _curl_direction(shot_params)
 		report.curl_strength = _curl_strength(shot_params.spin_rate, shot_params.spin_axis.y)
 		report.support_feedback = _support_feedback(_input_data)
@@ -89,12 +94,28 @@ func _coach_tip(input_data: FreeKickInputData, params: ShotParams, report: FreeK
 		return "Use all steps before the timer expires for better control."
 	if report.outcome == &"goal":
 		return "Good sequence. Repeat the same plant side and contact, then vary only foot angle."
+	# Name the flaw that actually moved the ball, so misses can be read and corrected.
+	match params.dominant_flaw:
+		&"overpower":
+			return "Over-hit: past the ideal zone the ball flies high. Stop the power bar earlier."
+		&"cramped_plant":
+			return "Plant too close: the strike got jammed and stayed low. Plant a little wider."
+		&"overextended_plant":
+			return "Plant too wide: the leg dragged the ball across your body. Plant closer to the ball."
+		&"plant_depth":
+			return "Plant depth tipped the ball %s. Plant level with, or just ahead of, the ball." % ("up" if params.final_error.y > 0.0 else "down")
+		&"open_foot":
+			return "Foot opened too far: the ball ran further across. Keep the plant angle more controlled."
+		&"messy_contact":
+			return "Messy trace sliced the ball sideways. Draw one clean, even stroke."
+		&"toe_poke":
+			return "Toe-poke popped the ball up. Drag through the ball instead of tapping."
 	if params.elevation_angle > 28.0:
 		return "Too much lift: start contact closer to center or swipe less upward."
 	if params.elevation_angle < 6.0:
 		return "Too low: start lower on the ball or swipe slightly upward."
 	var visible_spin := params.spin_rate * absf(params.spin_axis.y)
-	if visible_spin < 28.0:
+	if visible_spin < ShotCalculator.VISIBLE_CURL_LOW:
 		return "Need more curl: hit farther to the side and drag longer sideways through the ball."
 	if absf(params.horizontal_angle) > 10.0:
 		return "Aim correction is large: rotate the support-foot angle closer to neutral."
@@ -103,14 +124,14 @@ func _coach_tip(input_data: FreeKickInputData, params: ShotParams, report: FreeK
 	return "Balanced shot. Adjust one variable at a time: plant depth, foot angle, then ball contact."
 
 func _curl_direction(params: ShotParams) -> StringName:
-	if absf(params.spin_axis.y) < 0.18 or params.spin_rate < 18.0:
+	if absf(params.spin_axis.y) < 0.18 or params.spin_rate < ShotCalculator.VISIBLE_CURL_STRAIGHT:
 		return &"straight"
 	return &"right" if params.spin_axis.y > 0.0 else &"left"
 
 func _curl_strength(spin_rate: float, side_axis: float) -> StringName:
 	var visible_spin := spin_rate * absf(side_axis)
-	if visible_spin < 28.0:
+	if visible_spin < ShotCalculator.VISIBLE_CURL_LOW:
 		return &"low"
-	if visible_spin < 75.0:
+	if visible_spin < ShotCalculator.VISIBLE_CURL_MEDIUM:
 		return &"medium"
 	return &"high"

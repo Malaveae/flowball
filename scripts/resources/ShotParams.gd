@@ -16,8 +16,14 @@ extends Resource
 @export var curve_bias: float = 0.0
 @export var error_cone_degrees: float = 0.0
 @export var final_error: Vector2 = Vector2.ZERO
+# Technical flaw that moved the shot most (ShotCalculator._flaw_terms key), &"" if clean.
+@export var dominant_flaw: StringName = &""
 @export var shot_type: StringName = &"unknown"
 @export var gesture_technique: int = ContactGesture.Technique.LACE
 @export var gesture_quality: float = 1.0
 @export var gesture_l_max: float = 1.8
 @export var quality_dispersion_degrees: float = 0.0
+# Knuckle (deterministic late wobble applied in flight by BallAerodynamics3D).
+@export_range(0.0, 1.0, 0.001) var knuckle_gain: float = 0.0
+@export var knuckle_seed: int = 0
+@export var knuckle_amp: float = 0.0 # m/s^2 at 30 m/s and full gain

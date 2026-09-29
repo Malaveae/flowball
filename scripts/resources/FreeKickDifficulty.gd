@@ -30,6 +30,10 @@ extends Resource
 @export var min_swipe_scale: float = 0.6  # trace cap at 100% power: no room for a long curl swipe
 @export_range(0.0, 1.0, 0.01) var spin_power_loss: float = 0.75  # spin rate multiplier loss at full over-power
 
+# Knuckle: peak lateral wobble acceleration (m/s^2) at 30 m/s and full knuckle gain.
+# Calibrated by outcome, not real aerodynamics: 16 -> ~0.4 m RMS drift over a 34 m flight.
+@export_range(0.0, 30.0, 0.5) var knuckle_amp_max: float = 16.0
+
 func step_time_budget(power: float, step: int) -> float:
 	# Full base time up to the ideal zone ceiling, then drops toward the per-step floor at full power.
 	var base_time := step2_time_limit if step == 2 else step3_time_limit

@@ -54,6 +54,8 @@ func reset_for_free_kick(position: Vector3 = Vector3(0.0, 0.16, 0.0)) -> void:
 	active_shot = null
 	_rest_time = 0.0
 	_net_capture_active = false
+	if aerodynamics != null:
+		aerodynamics.end_shot()
 	freeze = true
 	sleeping = false
 	linear_velocity = Vector3.ZERO
@@ -81,6 +83,8 @@ func launch(shot_params: ShotParams, kicker: Node3D = null, ignore_seconds: floa
 	sleeping = false
 	linear_velocity = shot_params.launch_velocity
 	angular_velocity = shot_params.spin_axis.normalized() * shot_params.spin_rate
+	if aerodynamics != null:
+		aerodynamics.begin_shot(shot_params)
 	if kicker != null:
 		add_collision_exception_with(kicker)
 		_restore_collision_exception_later(kicker, ignore_seconds)

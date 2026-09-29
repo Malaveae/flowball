@@ -45,6 +45,21 @@ func _init() -> void:
 	ok = _test_runup_distance_risk_zone_speed() and ok
 	ok = _test_runup_angle_reaches_ideal_power_sooner_when_straight() and ok
 	ok = _test_runup_angle_widens_power_window_when_straight() and ok
+	ok = _test_set_piece_wind_is_repeatable() and ok
+	ok = _test_set_piece_wind_respects_range_and_toggle() and ok
+	ok = _test_knuckle_canonical_strike_is_reachable() and ok
+	ok = _test_knuckle_params_are_repeatable() and ok
+	ok = _test_knuckle_gain_zero_with_spin_or_slow_ball() and ok
+	ok = _test_knuckle_zero_amp_has_no_wobble() and ok
+	ok = _test_knuckle_flight_is_repeatable() and ok
+	ok = _test_knuckle_drift_rms_in_band() and ok
+	ok = _test_clean_strike_has_no_flaw_error() and ok
+	ok = _test_overpower_flaw_sends_ball_high() and ok
+	ok = _test_cramped_plant_keeps_ball_low() and ok
+	ok = _test_overextended_plant_drags_across_kicking_foot() and ok
+	ok = _test_open_foot_flaw_follows_aim() and ok
+	ok = _test_flaw_error_is_smooth() and ok
+	ok = _test_runup_speed_peaks_mid_angle() and ok
 	quit(0 if ok else 1)
 
 func _base_input(power: float = 0.7) -> FreeKickInputData:
@@ -215,7 +230,8 @@ func _test_plant_distance_optimal_keeps_full_lane() -> bool:
 	center_input.support_aim_target = 0.0
 	var full := ShotCalculator.calculate(input, _stats(), _environment(), _difficulty())
 	var center := ShotCalculator.calculate(center_input, _stats(), _environment(), _difficulty())
-	var passed := is_equal_approx(absf(full.horizontal_angle - center.horizontal_angle), 35.0)
+	# Lane size only: full aim (1.0) is also an over-opened foot, whose flaw is tested separately.
+	var passed := is_equal_approx(absf(_aim_without_flaw(full) - _aim_without_flaw(center)), 35.0)
 	_print_result("optimal plant keeps full aim lane (35 deg)", passed)
 	return passed
 
@@ -250,7 +266,7 @@ func _test_spot_angle_is_not_double_counted() -> bool:
 	var right := ShotCalculator.calculate(right_input, _stats(), environment, _difficulty())
 	# The spot angle is already represented by environment.base_goal_direction.
 	# horizontal_angle should only contain the support aim offset: full target lane = 35 degrees.
-	var passed := is_equal_approx(absf(right.horizontal_angle - center.horizontal_angle), 35.0)
+	var passed := is_equal_approx(absf(_aim_without_flaw(right) - _aim_without_flaw(center)), 35.0)
 	_print_result("spot angle is not double-counted", passed)
 	return passed
 
@@ -655,6 +671,218 @@ func _test_runup_angle_widens_power_window_when_straight() -> bool:
 		- _hold_time_for_power_runup(stats, difficulty, 0.0, 0.70, 0.0, true)
 	var passed := straight_window > lateral_window
 	_print_result("straight-on run-up widens the power window (more forgiving) than a lateral run-up", passed)
+	return passed
+
+const SANDBOX_SCRIPT_PATH := "res://scripts/state_machine/FreeKickSandbox.gd"
+
+func _test_set_piece_wind_is_repeatable() -> bool:
+	# All three attempts of a set piece (and replays across sessions) must see the same wind.
+	var sandbox: GDScript = load(SANDBOX_SCRIPT_PATH)
+	var passed := true
+	var any_differs := false
+	var first: Vector3 = sandbox.wind_for_set_piece(1, 0.0, 3.0, true)
+	for set_piece in range(1, 41):
+		var a: Vector3 = sandbox.wind_for_set_piece(set_piece, 0.0, 3.0, true)
+		var b: Vector3 = sandbox.wind_for_set_piece(set_piece, 0.0, 3.0, true)
+		var c: Vector3 = sandbox.wind_for_set_piece(set_piece, 0.0, 3.0, true)
+		passed = passed and a.is_equal_approx(b) and b.is_equal_approx(c)
+		if not a.is_equal_approx(first):
+			any_differs = true
+	passed = passed and any_differs
+	_print_result("same set piece always gets the same wind (and set pieces differ)", passed)
+	return passed
+
+func _test_set_piece_wind_respects_range_and_toggle() -> bool:
+	var sandbox: GDScript = load(SANDBOX_SCRIPT_PATH)
+	var passed := true
+	for set_piece in range(1, 61):
+		var wind: Vector3 = sandbox.wind_for_set_piece(set_piece, 1.0, 3.0, true)
+		var speed := wind.length()
+		passed = passed and speed >= 1.0 - 0.001 and speed <= 3.0 + 0.001 and is_zero_approx(wind.y)
+		passed = passed and sandbox.wind_for_set_piece(set_piece, 1.0, 3.0, false) == Vector3.ZERO
+	_print_result("set piece wind stays within its range and is zero when disabled", passed)
+	return passed
+
+## Canonical knuckle input: near-center contact, short straight trace through the ball,
+## power inside the ideal zone, no timer defaults.
+func _knuckle_input() -> FreeKickInputData:
+	var input := _base_input(0.8)
+	input.impact_point = Vector2(0.05, 0.05)
+	input.swipe_points = PackedVector2Array([Vector2(0.05, 0.05), Vector2(0.05, -0.25)])
+	input.swipe_duration = 0.2
+	return input
+
+func _test_knuckle_canonical_strike_is_reachable() -> bool:
+	var params := ShotCalculator.calculate(_knuckle_input(), _stats(), _environment(), _difficulty())
+	var passed := params.knuckle_gain > 0.5 and params.spin_rate < 8.0 and params.shot_type == &"knuckle_power"
+	# A normal curled strike must not trigger it.
+	var curled := ShotCalculator.calculate(_base_input(0.8), _stats(), _environment(), _difficulty())
+	passed = passed and is_zero_approx(curled.knuckle_gain)
+	_print_result("clean center strike in the ideal zone reaches knuckle (gain %.2f, spin %.1f)" % [params.knuckle_gain, params.spin_rate], passed)
+	return passed
+
+func _test_knuckle_params_are_repeatable() -> bool:
+	var environment := _environment()
+	environment.set_piece_seed = 7
+	var a := ShotCalculator.calculate(_knuckle_input(), _stats(), environment, _difficulty())
+	var b := ShotCalculator.calculate(_knuckle_input(), _stats(), environment, _difficulty())
+	var other_set_piece := _environment()
+	other_set_piece.set_piece_seed = 8
+	var c := ShotCalculator.calculate(_knuckle_input(), _stats(), other_set_piece, _difficulty())
+	var passed := is_equal_approx(a.knuckle_gain, b.knuckle_gain) \
+		and a.knuckle_seed == b.knuckle_seed \
+		and is_equal_approx(a.knuckle_amp, b.knuckle_amp) \
+		and a.knuckle_seed != c.knuckle_seed
+	_print_result("same input + set piece -> same knuckle gain/seed/amp", passed)
+	return passed
+
+func _test_knuckle_gain_zero_with_spin_or_slow_ball() -> bool:
+	var passed := is_zero_approx(ShotCalculator.knuckle_physical_gain(30.0, 14.0)) \
+		and is_zero_approx(ShotCalculator.knuckle_physical_gain(30.0, 40.0)) \
+		and is_zero_approx(ShotCalculator.knuckle_physical_gain(16.0, 0.0)) \
+		and is_zero_approx(ShotCalculator.knuckle_physical_gain(12.0, 2.0)) \
+		and is_equal_approx(ShotCalculator.knuckle_physical_gain(30.0, 2.0), 1.0)
+	_print_result("knuckle gain is 0 with spin >= 14 rad/s or speed <= 16 m/s", passed)
+	return passed
+
+func _test_knuckle_zero_amp_has_no_wobble() -> bool:
+	var passed := true
+	for i in range(60):
+		var t := float(i) / 30.0
+		passed = passed and BallAerodynamics3D.knuckle_accel(t, 30.0, 1234, 1.0, 0.0) == Vector2.ZERO
+		passed = passed and BallAerodynamics3D.knuckle_accel(t, 30.0, 1234, 0.0, 16.0) == Vector2.ZERO
+	# No wobble before the activation delay either.
+	passed = passed and BallAerodynamics3D.knuckle_accel(0.1, 30.0, 1234, 1.0, 16.0) == Vector2.ZERO
+	_print_result("knuckle wobble is zero with amp 0, gain 0, or before activation", passed)
+	return passed
+
+## Knuckle-only lateral/vertical drift over a straight 30 m/s flight (fixed 60 Hz step).
+func _knuckle_drift(seed: int, amp: float, flight_time: float = 1.2) -> Vector2:
+	var vel := Vector2.ZERO
+	var pos := Vector2.ZERO
+	var dt := 1.0 / 60.0
+	var t := 0.0
+	while t < flight_time:
+		t += dt
+		vel += BallAerodynamics3D.knuckle_accel(t, 30.0, seed, 1.0, amp) * dt
+		pos += vel * dt
+	return pos
+
+func _test_knuckle_flight_is_repeatable() -> bool:
+	var reference := _knuckle_drift(424242, 16.0)
+	var passed := reference.length() > 0.0
+	for _i in range(100):
+		passed = passed and _knuckle_drift(424242, 16.0) == reference
+	_print_result("100 repetitions of the same knuckle give the same drift", passed)
+	return passed
+
+func _test_knuckle_drift_rms_in_band() -> bool:
+	# Report calibration (30 m/s, ~34 m, amp 16): RMS lateral drift ~0.43 m, visible but not wild.
+	var sum_sq := 0.0
+	var max_dx := 0.0
+	for s in range(200):
+		var drift := _knuckle_drift(hash(s * 7919 + 17), 16.0)
+		sum_sq += drift.x * drift.x
+		max_dx = maxf(max_dx, absf(drift.x))
+	var rms := sqrt(sum_sq / 200.0)
+	var passed := rms >= 0.3 and rms <= 0.55 and max_dx <= 1.6
+	_print_result("knuckle drift RMS %.2f m (max %.2f m) within the calibrated band" % [rms, max_dx], passed)
+	return passed
+
+func _aim_without_flaw(params: ShotParams) -> float:
+	return params.horizontal_angle - params.final_error.x
+
+## Clean reference strike: optimal plant, balanced depth, controlled aim, ideal power,
+## centered straight trace (gesture quality only affects the slice via off-center contact).
+func _clean_input(power: float = 0.75) -> FreeKickInputData:
+	var input := _base_input(power)
+	input.support_vector = Vector2(-0.28, -0.10)
+	input.plant_depth = -0.10
+	input.support_aim_target = 0.3
+	input.impact_point = Vector2.ZERO
+	input.swipe_points = PackedVector2Array([Vector2.ZERO, Vector2(0.0, -0.3)])
+	return input
+
+func _test_clean_strike_has_no_flaw_error() -> bool:
+	var shot := ShotCalculator.calculate(_clean_input(), _stats(), _environment(), _difficulty())
+	var passed := shot.final_error.length() < 0.0001 and shot.dominant_flaw == &""
+	_print_result("clean strike has no flaw error (%.4f deg)" % shot.final_error.length(), passed)
+	return passed
+
+func _test_overpower_flaw_sends_ball_high() -> bool:
+	var clean := ShotCalculator.calculate(_clean_input(0.80), _stats(), _environment(), _difficulty())
+	var over := ShotCalculator.calculate(_clean_input(1.0), _stats(), _environment(), _difficulty())
+	var passed := over.final_error.y > 1.0 and absf(over.final_error.x) < 0.0001 and clean.final_error.length() < 0.0001
+	_print_result("overpower lifts the shot (%.2f deg up)" % over.final_error.y, passed)
+	return passed
+
+func _test_cramped_plant_keeps_ball_low() -> bool:
+	var input := _clean_input()
+	input.support_vector = Vector2(-0.18, -0.10)
+	var shot := ShotCalculator.calculate(input, _stats(), _environment(), _difficulty())
+	var passed := shot.final_error.y < -0.5 and absf(shot.final_error.x) < 0.0001
+	_print_result("cramped plant keeps the shot low (%.2f deg)" % shot.final_error.y, passed)
+	return passed
+
+func _test_overextended_plant_drags_across_kicking_foot() -> bool:
+	# Right foot drags left, left foot drags right; mirrored plant positions with the same
+	# foot give the same error (support side must never aim).
+	var right_foot := _clean_input()
+	right_foot.support_vector = Vector2(-0.9, -0.10)
+	var right_foot_mirror := _clean_input()
+	right_foot_mirror.support_vector = Vector2(0.9, -0.10)
+	var left_foot := _clean_input()
+	left_foot.selected_foot = "left"
+	left_foot.support_vector = Vector2(0.9, -0.10)
+	var left_stats := _stats()
+	left_stats.preferred_foot = "left"
+	var r := ShotCalculator.calculate(right_foot, _stats(), _environment(), _difficulty())
+	var rm := ShotCalculator.calculate(right_foot_mirror, _stats(), _environment(), _difficulty())
+	var l := ShotCalculator.calculate(left_foot, left_stats, _environment(), _difficulty())
+	var passed := r.final_error.x < -0.5 and l.final_error.x > 0.5 and r.final_error.is_equal_approx(rm.final_error) 		and r.dominant_flaw == &"overextended_plant"
+	_print_result("overextended plant drags across the kicking foot (R %.2f, L %.2f deg)" % [r.final_error.x, l.final_error.x], passed)
+	return passed
+
+func _test_open_foot_flaw_follows_aim() -> bool:
+	var right := _clean_input()
+	right.support_aim_target = 1.0
+	var left := _clean_input()
+	left.support_aim_target = -1.0
+	var r := ShotCalculator.calculate(right, _stats(), _environment(), _difficulty())
+	var l := ShotCalculator.calculate(left, _stats(), _environment(), _difficulty())
+	var passed := r.final_error.x > 0.3 and l.final_error.x < -0.3
+	_print_result("over-opened foot runs further across (%.2f / %.2f deg)" % [r.final_error.x, l.final_error.x], passed)
+	return passed
+
+func _test_flaw_error_is_smooth() -> bool:
+	# The old error hashed raw inputs; now a tiny input change must give a tiny error change.
+	var worst := 0.0
+	var base := _base_input(0.95)
+	base.support_vector = Vector2(-0.6, 0.3)
+	base.plant_depth = 0.3
+	base.support_aim_target = 0.8
+	var reference := ShotCalculator.calculate(base, _stats(), _environment(), _difficulty())
+	for step in [Vector2(0.01, 0.0), Vector2(0.0, 0.01)]:
+		var nudged := _base_input(0.95)
+		nudged.support_vector = base.support_vector + step
+		nudged.plant_depth = base.plant_depth + step.y
+		nudged.support_aim_target = base.support_aim_target + step.x
+		nudged.hold_time = base.hold_time + 0.01
+		var shot := ShotCalculator.calculate(nudged, _stats(), _environment(), _difficulty())
+		worst = maxf(worst, shot.final_error.distance_to(reference.final_error))
+	var passed := worst < 0.15
+	_print_result("flaw error is smooth (max change %.3f deg for a 0.01 nudge)" % worst, passed)
+	return passed
+
+func _test_runup_speed_peaks_mid_angle() -> bool:
+	# Isokawa & Lees / Scurr & Hall: ball speed peaks at the 45-60deg (game convention) plateau
+	# and only eases off toward the ends - never the old 40% lateral cap.
+	var lateral := ShotCalculator.runup_speed_ceiling(0.0)
+	var peak := ShotCalculator.runup_speed_ceiling(52.0)
+	var straight := ShotCalculator.runup_speed_ceiling(90.0)
+	var smooth := absf(ShotCalculator.runup_speed_ceiling(44.9) - ShotCalculator.runup_speed_ceiling(45.1)) < 0.01
+	var passed := is_equal_approx(peak, 1.0) and lateral < straight and straight < peak and lateral >= 0.8 and smooth
+	_print_result("run-up speed peaks at mid angle (%.2f / %.2f / %.2f)" % [lateral, peak, straight], passed)
 	return passed
 
 func _print_result(label: String, passed: bool) -> void:

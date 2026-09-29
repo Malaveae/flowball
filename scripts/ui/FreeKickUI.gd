@@ -850,7 +850,18 @@ func _result_data_from_report(report: Resource) -> String:
 	var power := roundi(float(report.get("power")) * 100.0)
 	var elevation := roundi(float(report.get("elevation_angle")))
 	var curl := String(report.get("curl_strength"))
-	return "PWR %d%%  ·  ELEV %d°  ·  CURL %s" % [power, elevation, curl]
+	var text := "PWR %d%%  ·  ELEV %d°  ·  CURL %s" % [power, elevation, curl]
+	var knuckle := _knuckle_percent(report)
+	if knuckle > 0:
+		text += "  ·  KNUCKLE %d%%" % knuckle
+	return text
+
+## Knuckle gain as a percentage, or 0 when it's too small to be worth showing.
+func _knuckle_percent(report: Resource) -> int:
+	var gain = report.get("knuckle_gain")
+	if gain == null or float(gain) < 0.05:
+		return 0
+	return roundi(float(gain) * 100.0)
 
 func _show_result_card(title: String, cause: String, data: String, color: Color) -> void:
 	if result_card == null:
@@ -1168,7 +1179,10 @@ func _format_feedback_report(report: Resource) -> String:
 		lines.append("Contact: usable launch height")
 	if absf(horizontal) > 10.0:
 		lines.append("Aim: large support-foot target offset")
-	if spin_rate < 18.0 or curl_strength == "low":
+	var knuckle := _knuckle_percent(report)
+	if knuckle > 0:
+		lines.append("Knuckle: %d%% — clean center strike; the faint white ghost line is the no-wobble path" % knuckle)
+	elif spin_rate < ShotCalculator.VISIBLE_CURL_STRAIGHT or curl_strength == "low":
 		lines.append("Curl: low — add side contact or a longer sideways drag")
 	else:
 		lines.append("Curl: %s" % curl_strength)

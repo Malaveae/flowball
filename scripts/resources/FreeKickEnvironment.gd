@@ -8,3 +8,5 @@ extends Resource
 @export_range(1.0, 100.0, 1.0) var goalkeeper_rating: float = 70.0
 @export_range(0.0, 1.0, 0.01) var pressure_context: float = 0.5
 @export var base_goal_direction: Vector3 = Vector3(0.0, 0.0, -1.0)
+# Identifies the current set piece so seeded effects (knuckle wobble) repeat across its attempts.
+@export var set_piece_seed: int = 0

@@ -156,13 +156,13 @@ func _commit(use_default: bool) -> void:
 		controller.input_data.plant_depth = clampf(support.y, -1.0, 1.0)
 		controller.input_data.support_foot_angle = foot_angle
 		controller.input_data.support_aim_target = aim_target
-		controller.input_data.support_quality = _support_quality(support)
-		controller.input_data.support_angle_quality = _support_angle_quality(aim_target)
+		controller.input_data.support_quality = support_quality(support)
+		controller.input_data.support_angle_quality = support_angle_quality(aim_target)
 	if not use_default:
 		controller._step2_end_msec = Time.get_ticks_msec()
 	finished.emit(&"BallContactState")
 
-func _support_quality(support: Vector2) -> float:
+static func support_quality(support: Vector2) -> float:
 	# Hidden biomechanical anchor model from piedeapoyo.md.
 	# Normalized UI distances map roughly to real plant distance bands:
 	# 0.00-0.15 too close, 0.20-0.35 optimal, 0.40-0.55 risky, >0.55 strongly penalized.
@@ -181,7 +181,7 @@ func _support_quality(support: Vector2) -> float:
 	var depth_quality := 1.0 - clampf(absf(depth + 0.10) / 0.75, 0.0, 1.0) * 0.35
 	return clampf(lateral_quality * depth_quality, 0.18, 1.0)
 
-func _support_angle_quality(target: float) -> float:
+static func support_angle_quality(target: float) -> float:
 	# 0 = foot points at target for straight/power. 10-25 degrees open is still good for curl.
 	# The radial gesture maps to about +/-30 degrees visually, so full extremes trade control for shape.
 	var open_amount := absf(clampf(target, -1.0, 1.0))

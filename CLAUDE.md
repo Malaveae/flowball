@@ -15,6 +15,14 @@ godot --headless --script scripts/tests/ShotCalculatorSmokeTest.gd
 # Other smoke tests under scripts/tests/ follow the same invocation pattern, e.g.:
 godot --headless --script scripts/tests/SupportPlantGestureSmokeTest.gd
 godot --headless --script scripts/tests/FreeKickUIScaleSmokeTest.gd
+godot --headless --script scripts/tests/BallFlightSimulatorSmokeTest.gd   # offline flight vs real Jolt launch
+
+# Historical free-kick feasibility (Collection mode, ~2 min); rewrites docs/validation/historical-feasibility.md.
+godot --headless --script scripts/tools/HistoricalKickValidator.gd
+godot --headless --script scripts/tools/HistoricalKickValidator.gd -- --only=<kick-id> --samples=40000
+
+# After adding a new `class_name` script, refresh the global class cache or headless runs fail to resolve it.
+godot --headless --path . --import
 
 # Open the project in the editor / run the sandbox scene directly.
 godot -e --path .
@@ -22,6 +30,10 @@ godot --path .
 ```
 
 There is no build step (GDScript is interpreted) and no linter configured; the smoke tests are the correctness gate, especially for `ShotCalculator.gd`.
+
+## Collection-mode validation
+
+`data/historical_free_kicks.json` (loaded by `HistoricalFreeKickCatalog`) holds real free kicks as envelope ranges with cited sources. `scripts/physics/BallFlightSimulator.gd` replays a flight offline using the same `BallAerodynamics3D` force functions and Jolt's step order (damping → gravity → position → custom forces, spin clamped to Jolt's `max_angular_velocity`); keep it in parity with the runtime whenever `apply_forces` changes (the smoke test checks it). `docs/validation/phase1-findings.md` lists the confirmed gaps.
 
 ## Architecture
 

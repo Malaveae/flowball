@@ -1,0 +1,231 @@
+{
+  "_schema": "Collection-mode source of truth. Coordinates: goal-mouth x = kicker's right (+) / left (-) of goal center (m), y = ball-center height (m). Spot lateral_m = ball offset from the goal's center line (+ = kicker's right). Envelope fields are [min, max]; omitted = no data. curl_m = signed max deviation from the straight chord ball->goal entry (+ = path bulges to the kicker's right). wall_plane_height_m = ball-center height crossing the 9.15 m wall plane (1.8 m wall + ball radius => >= 1.95 to clear a standing wall). Confidence: measured (published analysis), broadcast_estimate (commentary/press figures), derived (inferred from descriptions/geometry, needs footage review).",
+  "kicks": [
+    {
+      "id": "ronaldo-spain-2018",
+      "title": "Hat-trick equaliser",
+      "kicker": "Cristiano Ronaldo",
+      "match": "Portugal 3-3 Spain, World Cup group stage, Sochi",
+      "date": "2018-06-15",
+      "foot": "right",
+      "technique": "instep curl over the wall (not his knuckle)",
+      "distance_m": 22.0,
+      "lateral_m": 0.0,
+      "wall_count": 4,
+      "envelope": {
+        "launch_speed_ms": [26.0, 34.0],
+        "flight_time_s": [0.75, 0.90],
+        "curl_m": [0.5, 1.4],
+        "goal_entry_x_m": [1.7, 2.8],
+        "goal_entry_y_m": [1.5, 2.33],
+        "wall_plane_height_m": [1.95, 3.5]
+      },
+      "confidence": "measured",
+      "sources": [
+        "Shankara 2018, Analysis of Cristiano Ronaldo's Free Kick using CFD, icSPORTS extended abstracts pp.40-43: 22 m, 26.8 m/s, ~5 rev/s, 0.82 s flight, ~3.5 m deflection from launch line, ball hits net ~5.9 m from the (kicker's) left post. https://www.scitepress.org/Papers/2018/72360/72360.pdf",
+        "FIFA: World Cup wonder goals - Cristiano Ronaldo v Spain (2018)"
+      ],
+      "notes": "The paper's 26.8 m/s equals 22 m / 0.82 s, i.e. most likely the mean speed; launch speed must be higher under drag, so the speed range starts at the mean and is capped at a generous 34 m/s. 3.5 m is deflection from the launch line; chord sagitta of a circular arc is ~1/4 of that (~0.9 m), hence curl_m. Spin ~31 rad/s. Lateral spot position not given (0 assumed). Entry side inferred from right-foot instep curl that 'curves away from the goal initially before curving back'."
+    },
+    {
+      "id": "roberto-carlos-france-1997",
+      "title": "The banana shot",
+      "kicker": "Roberto Carlos",
+      "match": "France 1-1 Brazil, Tournoi de France, Lyon",
+      "date": "1997-06-03",
+      "foot": "left",
+      "technique": "outside-of-the-foot curl around the wall",
+      "distance_m": 35.0,
+      "lateral_m": 2.0,
+      "wall_count": 4,
+      "envelope": {
+        "launch_speed_ms": [29.0, 38.5],
+        "curl_m": [1.5, 5.5],
+        "goal_entry_x_m": [2.6, 3.55]
+      },
+      "confidence": "broadcast_estimate",
+      "sources": [
+        "Dupeux, Le Goff, Quere, Clanet 2010, The spinning ball spiral, New J. Phys. 12 093004 (via Physics World: ~35 m, spiral needs the long distance, cleared the wall by at least 1 m, entered at the right-hand post). https://physicsworld.com/a/brazilian-wondergoal-was-no-fl/",
+        "Press speed estimates range 105-137 km/h (29-38 m/s); not from a measurement."
+      ],
+      "notes": "Left-foot outside strike: launched right of the wall, bends left, in off the inside of the kicker's-right post. Height at entry unclear in sources (post, low-to-mid). Lateral spot offset is an estimate. Physically depends on drag growth as the ball slows (spiral) - a constant-Cd model may not reproduce the late bend."
+    },
+    {
+      "id": "ronaldo-portsmouth-2008",
+      "title": "The knuckleball",
+      "kicker": "Cristiano Ronaldo",
+      "match": "Manchester United 2-0 Portsmouth, Premier League, Old Trafford",
+      "date": "2008-01-30",
+      "foot": "right",
+      "technique": "knuckleball (low spin, erratic late movement)",
+      "distance_m": 23.0,
+      "lateral_m": 0.0,
+      "wall_count": 4,
+      "knuckle_expected": true,
+      "envelope": {
+        "launch_speed_ms": [30.0, 38.0],
+        "curl_m": [-0.8, 0.8],
+        "goal_entry_x_m": [2.2, 3.55],
+        "goal_entry_y_m": [1.7, 2.33],
+        "wall_plane_height_m": [1.95, 3.5]
+      },
+      "confidence": "broadcast_estimate",
+      "sources": [
+        "90min, Anatomy of a goal: 25-yard effort, knuckleball into the top-right corner past David James.",
+        "Speed widely quoted ~136 km/h (37.8 m/s); press figure, not a published measurement."
+      ],
+      "notes": "25 yards = 22.9 m. Lateral spot position not given."
+    },
+    {
+      "id": "juninho-bayern-2003",
+      "title": "Kahn beaten from distance",
+      "kicker": "Juninho Pernambucano",
+      "match": "Bayern Munich 1-2 Lyon, Champions League group stage, Olympiastadion",
+      "date": "2003",
+      "foot": "right",
+      "technique": "long-range knuckleball, high then dipping",
+      "distance_m": 32.0,
+      "lateral_m": 0.0,
+      "wall_count": 4,
+      "knuckle_expected": true,
+      "envelope": {
+        "goal_entry_x_m": [2.6, 3.55],
+        "wall_plane_height_m": [2.2, 5.0]
+      },
+      "confidence": "derived",
+      "sources": [
+        "UEFA, The best free kicks in Champions League history; Juninho: 'my best knuckleball free-kick from a long distance'. Roughly 35 yards (~32 m); in off the inside of Kahn's left-hand post (kicker's right)."
+      ],
+      "notes": "'Flew high, looked over, dipped late' - wall-plane height range reflects that description. Exact date/entry height need footage review."
+    },
+    {
+      "id": "messi-liverpool-2019",
+      "title": "600th Barcelona goal",
+      "kicker": "Lionel Messi",
+      "match": "Barcelona 3-0 Liverpool, Champions League semi-final 1st leg, Camp Nou",
+      "date": "2019-05-01",
+      "foot": "left",
+      "technique": "instep curl over the wall into the top corner",
+      "distance_m": 27.0,
+      "lateral_m": 0.0,
+      "wall_count": 4,
+      "envelope": {
+        "goal_entry_y_m": [1.7, 2.33],
+        "wall_plane_height_m": [1.95, 3.5]
+      },
+      "confidence": "derived",
+      "sources": [
+        "Sports Illustrated / UEFA: curled into the top corner from ~25-30 yards; UEFA Goal of the Season 2018/19."
+      ],
+      "notes": "Entry side (x) deliberately omitted until confirmed from footage."
+    },
+    {
+      "id": "bale-england-2016",
+      "title": "Power and dip at the Euros",
+      "kicker": "Gareth Bale",
+      "match": "England 2-1 Wales, Euro 2016 group stage, Lens",
+      "date": "2016-06-16",
+      "foot": "left",
+      "technique": "driven knuckle/dip (Bale: deliberately more power and dip than curl)",
+      "distance_m": 32.0,
+      "lateral_m": 0.0,
+      "wall_count": 4,
+      "knuckle_expected": true,
+      "envelope": {
+        "goal_entry_x_m": [2.0, 3.55],
+        "wall_plane_height_m": [1.95, 4.0]
+      },
+      "confidence": "derived",
+      "sources": [
+        "Sports Illustrated: 35-yard knuckling free kick; Hart got hands to it diving toward his left post (kicker's right).",
+        "Sky Sports: Bale on altering his free-kick style for power and dip."
+      ],
+      "notes": "Keeper got a touch - the goal-entry point is after the touch in real life; envelope uses pre-touch target."
+    },
+    {
+      "id": "ronaldinho-bremen-2006",
+      "title": "Under the wall",
+      "kicker": "Ronaldinho",
+      "match": "Barcelona 2-0 Werder Bremen, Champions League group stage, Camp Nou",
+      "date": "2006",
+      "foot": "right",
+      "technique": "placed low under a jumping wall",
+      "distance_m": 21.0,
+      "lateral_m": 0.0,
+      "wall_count": 4,
+      "envelope": {
+        "goal_entry_y_m": [0.11, 0.6],
+        "wall_plane_height_m": [0.11, 0.45]
+      },
+      "confidence": "derived",
+      "sources": [
+        "UEFA match report 'Barcelona break Bremen hearts': 13th-minute free kick from the edge of the area, under the wall into the bottom corner.",
+        "ESPN, Behind the wall: how Ronaldinho's free kicks helped spark the lie-down-behind-the-wall trend."
+      ],
+      "notes": "Only replicable if the wall jumps (FreeKickSandbox wall jumps are seeded and start at set piece 30) and if a low/skidding ball is allowed - BallFlightSimulator stops at first ground contact."
+    },
+    {
+      "id": "nakamura-manutd-2006",
+      "title": "Celtic Park top corner",
+      "kicker": "Shunsuke Nakamura",
+      "match": "Celtic 1-0 Manchester United, Champions League group stage, Celtic Park",
+      "date": "2006-11-21",
+      "foot": "left",
+      "technique": "instep curl over the wall",
+      "distance_m": 26.0,
+      "lateral_m": 0.0,
+      "wall_count": 4,
+      "envelope": {
+        "goal_entry_y_m": [1.7, 2.33],
+        "wall_plane_height_m": [1.95, 3.5]
+      },
+      "confidence": "derived",
+      "sources": [
+        "UEFA 'Celtic marvel made in Japan': 25-metre free kick into the top corner.",
+        "SPORTbible: 30 yards, past a full-stretch Van der Sar into the top corner."
+      ],
+      "notes": "Distance sources disagree (25 m vs 27.4 m); 26 m used. Entry side omitted until footage review."
+    },
+    {
+      "id": "koeman-sampdoria-1992",
+      "title": "Wembley extra-time winner",
+      "kicker": "Ronald Koeman",
+      "match": "Barcelona 1-0 Sampdoria (a.e.t.), European Cup final, Wembley",
+      "date": "1992-05-20",
+      "foot": "right",
+      "technique": "driven power strike",
+      "distance_m": 23.0,
+      "lateral_m": 0.0,
+      "wall_count": 4,
+      "envelope": {},
+      "confidence": "derived",
+      "sources": [
+        "Wikipedia, 1992 European Cup final: 112th-minute free kick, ~25 yards.",
+        "Champions Journal, How Koeman's thunderbolt sparked Barcelona into life."
+      ],
+      "notes": "Envelope empty on purpose: height/side/speed need footage review. Kept in the pilot as the 'driven power' archetype."
+    },
+    {
+      "id": "beckham-greece-2001",
+      "title": "93rd-minute qualifier",
+      "kicker": "David Beckham",
+      "match": "England 2-2 Greece, World Cup qualifier, Old Trafford",
+      "date": "2001-10-06",
+      "foot": "right",
+      "technique": "instep curl up and over the wall into the far corner",
+      "distance_m": 27.0,
+      "lateral_m": 0.0,
+      "wall_count": 4,
+      "envelope": {
+        "goal_entry_x_m": [-3.55, -1.8],
+        "goal_entry_y_m": [1.4, 2.33],
+        "wall_plane_height_m": [1.95, 3.5]
+      },
+      "confidence": "derived",
+      "sources": [
+        "Planet Football, An ode to David Beckham vs Greece: ~30 yards, up and over the wall, curled into the far corner (93rd minute)."
+      ],
+      "notes": "30 yards = 27.4 m. Far corner for a right-foot curl = kicker's left. Lateral spot offset unknown."
+    }
+  ]
+}

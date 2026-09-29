@@ -593,46 +593,17 @@ uv1_scale = Vector3(42, 64, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_goal_background_floor"]
 material = SubResource("StandardMaterial3D_pitch_grass")
-size = Vector3(68, 0.05, 5.6)
+size = Vector3(78, 0.05, 5.6)
 
 [sub_resource type="BoxShape3D" id="BoxShape_goal_background_floor"]
-size = Vector3(68, 0.1, 5.6)
+size = Vector3(78, 0.1, 5.6)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_field_line"]
-albedo_color = Color(0.92, 0.92, 0.86, 1)
-roughness = 0.65
+[sub_resource type="BoxMesh" id="BoxMesh_pitch_surround"]
+material = SubResource("StandardMaterial3D_pitch_grass")
+size = Vector3(5, 0.05, 110.6)
 
-[sub_resource type="BoxMesh" id="BoxMesh_field_line_wide"]
-material = SubResource("StandardMaterial3D_field_line")
-size = Vector3(40, 0.012, 0.12)
-
-[sub_resource type="BoxMesh" id="BoxMesh_field_line_long"]
-material = SubResource("StandardMaterial3D_field_line")
-size = Vector3(0.12, 0.012, 30)
-
-[sub_resource type="BoxMesh" id="BoxMesh_penalty_line_wide"]
-material = SubResource("StandardMaterial3D_field_line")
-size = Vector3(16.5, 0.012, 0.12)
-
-[sub_resource type="BoxMesh" id="BoxMesh_penalty_line_depth"]
-material = SubResource("StandardMaterial3D_field_line")
-size = Vector3(0.12, 0.012, 16.5)
-
-[sub_resource type="BoxMesh" id="BoxMesh_goal_area_line_wide"]
-material = SubResource("StandardMaterial3D_field_line")
-size = Vector3(7.52, 0.012, 0.12)
-
-[sub_resource type="BoxMesh" id="BoxMesh_goal_area_line_depth"]
-material = SubResource("StandardMaterial3D_field_line")
-size = Vector3(0.12, 0.012, 5.5)
-
-[sub_resource type="BoxMesh" id="BoxMesh_penalty_mark"]
-material = SubResource("StandardMaterial3D_field_line")
-size = Vector3(0.22, 0.014, 0.22)
-
-[sub_resource type="BoxMesh" id="BoxMesh_center_spot"]
-material = SubResource("StandardMaterial3D_field_line")
-size = Vector3(0.18, 0.014, 0.18)
+[sub_resource type="BoxShape3D" id="BoxShape_pitch_surround"]
+size = Vector3(5, 0.1, 110.6)
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_goal"]
 friction = 0.28
@@ -673,25 +644,12 @@ albedo_texture = ExtResource("9_tribuna")
 material = SubResource("StandardMaterial3D_tribuna_background")
 size = Vector2(78, 43.9)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_background_grass"]
-shading_mode = 0
-albedo_texture = ExtResource("10_grass_albedo")
-uv1_scale = Vector3(28, 4.2, 1)
-
-[sub_resource type="QuadMesh" id="QuadMesh_background_grass"]
-material = SubResource("StandardMaterial3D_background_grass")
-size = Vector2(78, 8.5)
-
 [sub_resource type="BoxShape3D" id="BoxShape_tribuna_background"]
 size = Vector3(78, 43.9, 8)
 
 [sub_resource type="QuadMesh" id="QuadMesh_lateral_tribuna_background"]
 material = SubResource("StandardMaterial3D_tribuna_background")
 size = Vector2(105, 43.9)
-
-[sub_resource type="QuadMesh" id="QuadMesh_lateral_grass_blend"]
-material = SubResource("StandardMaterial3D_background_grass")
-size = Vector2(105, 8.5)
 
 [sub_resource type="BoxShape3D" id="BoxShape_lateral_tribuna_background"]
 size = Vector3(0.35, 43.9, 105)
@@ -869,56 +827,26 @@ mesh = SubResource("BoxMesh_goal_background_floor")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -55.3)
 shape = SubResource("BoxShape_goal_background_floor")
 
+[node name="PitchSurround" type="StaticBody3D" parent="." unique_id=1402277815]
+
+[node name="LeftMesh" type="MeshInstance3D" parent="PitchSurround" unique_id=1402277816]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -36.5, 0, -2.8)
+mesh = SubResource("BoxMesh_pitch_surround")
+
+[node name="LeftCollision" type="CollisionShape3D" parent="PitchSurround" unique_id=1402277817]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -36.5, 0, -2.8)
+shape = SubResource("BoxShape_pitch_surround")
+
+[node name="RightMesh" type="MeshInstance3D" parent="PitchSurround" unique_id=1402277818]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.5, 0, -2.8)
+mesh = SubResource("BoxMesh_pitch_surround")
+
+[node name="RightCollision" type="CollisionShape3D" parent="PitchSurround" unique_id=1402277819]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.5, 0, -2.8)
+shape = SubResource("BoxShape_pitch_surround")
+
 [node name="FieldLines" type="Node3D" parent="." unique_id=1616074076]
 script = ExtResource("8_field_markings")
-
-[node name="HalfwayLine" type="MeshInstance3D" parent="FieldLines" unique_id=796754967]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.035, 0)
-mesh = SubResource("BoxMesh_field_line_wide")
-
-[node name="LeftTouchlineHalf" type="MeshInstance3D" parent="FieldLines" unique_id=1345057168]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19.94, 0.035, -15)
-mesh = SubResource("BoxMesh_field_line_long")
-
-[node name="RightTouchlineHalf" type="MeshInstance3D" parent="FieldLines" unique_id=495021593]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19.94, 0.035, -15)
-mesh = SubResource("BoxMesh_field_line_long")
-
-[node name="GoalLine" type="MeshInstance3D" parent="FieldLines" unique_id=136226012]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.035, -24)
-mesh = SubResource("BoxMesh_field_line_wide")
-
-[node name="PenaltyAreaTop" type="MeshInstance3D" parent="FieldLines" unique_id=1865225971]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.037, -7.5)
-mesh = SubResource("BoxMesh_penalty_line_wide")
-
-[node name="PenaltyAreaLeft" type="MeshInstance3D" parent="FieldLines" unique_id=1328797981]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.25, 0.037, -15.75)
-mesh = SubResource("BoxMesh_penalty_line_depth")
-
-[node name="PenaltyAreaRight" type="MeshInstance3D" parent="FieldLines" unique_id=1022905709]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.25, 0.037, -15.75)
-mesh = SubResource("BoxMesh_penalty_line_depth")
-
-[node name="GoalAreaTop" type="MeshInstance3D" parent="FieldLines" unique_id=1495636143]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.039, -18.5)
-mesh = SubResource("BoxMesh_goal_area_line_wide")
-
-[node name="GoalAreaLeft" type="MeshInstance3D" parent="FieldLines" unique_id=1151053625]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.76, 0.039, -21.25)
-mesh = SubResource("BoxMesh_goal_area_line_depth")
-
-[node name="GoalAreaRight" type="MeshInstance3D" parent="FieldLines" unique_id=83780781]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.76, 0.039, -21.25)
-mesh = SubResource("BoxMesh_goal_area_line_depth")
-
-[node name="PenaltyMark" type="MeshInstance3D" parent="FieldLines" unique_id=1075415634]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.041, -13)
-mesh = SubResource("BoxMesh_penalty_mark")
-
-[node name="CenterSpot" type="MeshInstance3D" parent="FieldLines" unique_id=797679550]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.041, 0)
-mesh = SubResource("BoxMesh_center_spot")
 
 [node name="Ball3D" parent="." unique_id=1577724062 instance=ExtResource("2")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.16, 0)
@@ -983,10 +911,6 @@ physics_material_override = SubResource("PhysicsMaterial_tribuna_background")
 cast_shadow = 0
 mesh = SubResource("QuadMesh_tribuna_background")
 
-[node name="GrassBlend" type="MeshInstance3D" parent="TribunaBackground" unique_id=1249012034]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -17.7, 0.02)
-mesh = SubResource("QuadMesh_background_grass")
-
 [node name="CollisionShape3D" type="CollisionShape3D" parent="TribunaBackground" unique_id=1677641380]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.1)
 shape = SubResource("BoxShape_tribuna_background")
@@ -999,10 +923,6 @@ physics_material_override = SubResource("PhysicsMaterial_tribuna_background")
 cast_shadow = 0
 mesh = SubResource("QuadMesh_lateral_tribuna_background")
 
-[node name="GrassBlend" type="MeshInstance3D" parent="LeftLateralBackground" unique_id=962551836]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -17.7, 0.02)
-mesh = SubResource("QuadMesh_lateral_grass_blend")
-
 [node name="CollisionShape3D" type="CollisionShape3D" parent="LeftLateralBackground" unique_id=240751184]
 shape = SubResource("BoxShape_lateral_tribuna_background")
 
@@ -1013,10 +933,6 @@ physics_material_override = SubResource("PhysicsMaterial_tribuna_background")
 [node name="Mesh" type="MeshInstance3D" parent="RightLateralBackground" unique_id=1785234868]
 cast_shadow = 0
 mesh = SubResource("QuadMesh_lateral_tribuna_background")
-
-[node name="GrassBlend" type="MeshInstance3D" parent="RightLateralBackground" unique_id=1698616140]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -17.7, 0.02)
-mesh = SubResource("QuadMesh_lateral_grass_blend")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="RightLateralBackground" unique_id=1675562933]
 shape = SubResource("BoxShape_lateral_tribuna_background")

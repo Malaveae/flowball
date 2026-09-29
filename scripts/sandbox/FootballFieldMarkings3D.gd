@@ -1,5 +1,9 @@
+@tool
 class_name FootballFieldMarkings3D
 extends Node3D
+
+# Runs in the editor too, so the editor shows the same FIFA lines as the game. The generated
+# line meshes have no owner, so they are never saved into the scene file.
 
 # FIFA/IFAB common international pitch dimensions, in meters.
 const PITCH_LENGTH := 105.0

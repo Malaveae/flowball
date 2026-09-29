@@ -12,12 +12,24 @@ const GOAL_CENTER := Vector3(0.0, 1.2, -52.5)
 
 var wall_root: Node3D
 var wall_material: StandardMaterial3D
-var wall_rng := RandomNumberGenerator.new()
 
 const MAX_TRIALS_PER_SET_PIECE := 3
 const MIN_FREE_KICK_DISTANCE := 20.0
-const MAX_FREE_KICK_DISTANCE := 34.0
-const MAX_LATERAL_OFFSET := 10.5
+# Spot range caps (the early-level ramp is unchanged; only the ceilings grow). 40 m covers
+# long-range strikes; 18 m lateral covers tight-angle spots near the edge of the box.
+@export var max_free_kick_distance := 40.0
+@export var max_lateral_offset := 18.0
+
+# Wind is fixed per set piece (same for all three attempts) so the same input gives the
+# same result. Disable for album shots, which must be replicable with zero wind.
+@export var wind_enabled := true
+@export var wind_min_speed := 0.0
+@export var wind_max_speed := 3.0
+
+# Salts keep the per-set-piece seeded streams (wind, wall heights, wall jumps) independent.
+const WIND_SEED_SALT := 101
+const WALL_HEIGHT_SEED_SALT := 202
+const WALL_JUMP_SEED_SALT := 303
 const WALL_VARIATION_START_LEVEL := 30
 const WALL_MIN_HEIGHT_HIGH_LEVEL := 1.62
 const WALL_MAX_HEIGHT_HIGH_LEVEL := 2.05
@@ -38,7 +50,6 @@ var completed_set_pieces: Array[Dictionary] = []
 var player_catalog: FreeKickPlayerCatalog = FreeKickPlayerCatalog.new()
 
 func _ready() -> void:
-	wall_rng.randomize()
 	_setup_wall_dummies()
 	_find_grass_patch()
 	_setup_ground_shader()
@@ -76,6 +87,7 @@ func start_new_attempt(selected_foot: String = "right") -> void:
 func _apply_set_piece_spot() -> void:
 	var ball_position := current_set_piece["position"] as Vector3
 	controller.set_free_kick_spot(String(current_set_piece["label"]), ball_position, GOAL_CENTER)
+	controller.environment.set_piece_seed = set_piece_number
 	_position_wall_dummies(ball_position, int(current_set_piece.get("wall_count", DEFAULT_WALL_PLAYER_COUNT)))
 	_update_scoreboard()
 
@@ -84,10 +96,7 @@ func _start_attempt(selected_foot: String) -> void:
 		return
 	current_spot_attempts += 1
 	current_spot_goal_scored = false
-	# Randomize wind per attempt: 0.5-7 m/s, any horizontal direction.
-	var wind_angle := randf_range(0.0, TAU)
-	var wind_strength := randf_range(0.5, 7.0)
-	controller.environment.wind_vector = Vector3(cos(wind_angle) * wind_strength, 0.0, sin(wind_angle) * wind_strength)
+	controller.environment.wind_vector = current_set_piece.get("wind", Vector3.ZERO) as Vector3
 	if controller.ui != null:
 		controller.ui.set_environment_info(controller.environment.distance_to_goal, controller.environment.wind_vector, controller.environment.angle_to_goal)
 	if goalkeeper != null:
@@ -179,8 +188,8 @@ func _restart_run() -> void:
 
 func _generate_set_piece() -> void:
 	var difficulty_step: int = set_piece_number - 1
-	var distance: float = clampf(20.0 + float(difficulty_step) * 1.15, MIN_FREE_KICK_DISTANCE, MAX_FREE_KICK_DISTANCE)
-	var lateral_limit: float = minf(MAX_LATERAL_OFFSET, 2.0 + float(difficulty_step) * 0.85)
+	var distance: float = clampf(20.0 + float(difficulty_step) * 1.15, MIN_FREE_KICK_DISTANCE, max_free_kick_distance)
+	var lateral_limit: float = minf(max_lateral_offset, 2.0 + float(difficulty_step) * 0.85)
 	var lateral_wave: float = sin(float(set_piece_number) * 1.83) * lateral_limit
 	var z: float = GOAL_CENTER.z + distance
 	var wall_count: int = clampi(difficulty_step / 2, 0, DEFAULT_WALL_PLAYER_COUNT)
@@ -199,7 +208,23 @@ func _generate_set_piece() -> void:
 		"label": "#%d %s %.0fm - wall %d" % [set_piece_number, side_label.capitalize(), distance, wall_count],
 		"position": Vector3(lateral_wave, 0.16, z),
 		"wall_count": wall_count,
+		"wind": wind_for_set_piece(set_piece_number, wind_min_speed, wind_max_speed, wind_enabled),
 	}
+
+## Pure and seeded: the same set piece always yields the same wind (direction any, speed in
+## [min_speed, max_speed]), so all three attempts - and replays across sessions - match.
+static func wind_for_set_piece(set_piece: int, min_speed: float, max_speed: float, enabled: bool) -> Vector3:
+	if not enabled or max_speed <= 0.0:
+		return Vector3.ZERO
+	var rng := _set_piece_rng(set_piece, WIND_SEED_SALT)
+	var angle := rng.randf_range(0.0, TAU)
+	var speed := rng.randf_range(minf(min_speed, max_speed), max_speed)
+	return Vector3(cos(angle) * speed, 0.0, sin(angle) * speed)
+
+static func _set_piece_rng(set_piece: int, salt: int) -> RandomNumberGenerator:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(set_piece * 7919 + salt)
+	return rng
 
 var _grass_patches: Array[GrassPatch3D] = []
 
@@ -252,9 +277,18 @@ func _setup_ground_shader() -> void:
 	mat.set_shader_parameter("wear_spot_shot", Vector3(0.0, 0.0, 0.0))
 	mat.set_shader_parameter("wear_weights", Vector3(1.0, 0.9, 0.7))
 	pitch_mesh.material_override = mat
-	var goal_floor := get_node_or_null("GoalBackgroundFloor/Mesh") as MeshInstance3D
-	if goal_floor != null:
-		goal_floor.material_override = mat.duplicate()
+	# Floor between the pitch and the stands (behind the goal and both touchline strips). The
+	# shader tiles by mesh UV, so each piece scales the tiling by its size to keep the same
+	# grass density as the 68 x 105 m pitch.
+	for path in ["GoalBackgroundFloor/Mesh", "PitchSurround/LeftMesh", "PitchSurround/RightMesh"]:
+		var floor_mesh := get_node_or_null(path) as MeshInstance3D
+		if floor_mesh == null or not (floor_mesh.mesh is BoxMesh):
+			continue
+		var size := (floor_mesh.mesh as BoxMesh).size
+		var floor_mat := mat.duplicate() as ShaderMaterial
+		floor_mat.set_shader_parameter("uv_scale_x", 42.0 * size.x / 68.0)
+		floor_mat.set_shader_parameter("uv_scale_y", 64.0 * size.z / 105.0)
+		floor_mesh.material_override = floor_mat
 
 func _setup_wall_dummies() -> void:
 	wall_root = Node3D.new()
@@ -342,9 +376,10 @@ func _position_wall_dummies(ball_position: Vector3, active_wall_count: int = DEF
 
 func _roll_wall_heights(active_wall_count: int) -> Array[float]:
 	var heights: Array[float] = []
+	var rng := _set_piece_rng(set_piece_number, WALL_HEIGHT_SEED_SALT)
 	for i in range(active_wall_count):
 		if set_piece_number >= WALL_VARIATION_START_LEVEL:
-			heights.append(wall_rng.randf_range(WALL_MIN_HEIGHT_HIGH_LEVEL, WALL_MAX_HEIGHT_HIGH_LEVEL))
+			heights.append(rng.randf_range(WALL_MIN_HEIGHT_HIGH_LEVEL, WALL_MAX_HEIGHT_HIGH_LEVEL))
 		else:
 			heights.append(WALL_PLAYER_HEIGHT)
 	return heights
@@ -373,20 +408,22 @@ func _trigger_wall_jump_reactions() -> void:
 	if active_dummies.is_empty():
 		return
 	var jump_probability := clampf(0.35 + float(set_piece_number - WALL_VARIATION_START_LEVEL) * 0.015, 0.35, 0.9)
+	# Re-seeded on every shot from the set piece, so all three attempts see the same jumps.
+	var rng := _set_piece_rng(set_piece_number, WALL_JUMP_SEED_SALT)
 	var jumped := false
 	for dummy in active_dummies:
-		if wall_rng.randf() <= jump_probability:
-			_jump_wall_dummy(dummy)
+		if rng.randf() <= jump_probability:
+			_jump_wall_dummy(dummy, rng)
 			jumped = true
 	if not jumped:
-		_jump_wall_dummy(active_dummies[wall_rng.randi_range(0, active_dummies.size() - 1)])
+		_jump_wall_dummy(active_dummies[rng.randi_range(0, active_dummies.size() - 1)], rng)
 
-func _jump_wall_dummy(dummy: Node3D) -> void:
+func _jump_wall_dummy(dummy: Node3D, rng: RandomNumberGenerator) -> void:
 	var base_position := dummy.global_position
 	if dummy.has_meta("base_global_position"):
 		base_position = dummy.get_meta("base_global_position") as Vector3
 	dummy.global_position = base_position
-	var jump_height := wall_rng.randf_range(WALL_JUMP_MIN_HEIGHT, WALL_JUMP_MAX_HEIGHT)
+	var jump_height := rng.randf_range(WALL_JUMP_MIN_HEIGHT, WALL_JUMP_MAX_HEIGHT)
 	var tween := create_tween()
 	tween.set_trans(Tween.TRANS_SINE)
 	tween.set_ease(Tween.EASE_OUT)

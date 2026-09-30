@@ -18,6 +18,7 @@ signal mode_changed(mode: StringName)
 @export var shot_follow_transform := Transform3D(Basis(), Vector3(0.0, 1.15, 6.5))
 @export var feedback_transform := Transform3D(Basis(), Vector3(0.0, 2.2, 9.0))
 @export var default_fov: float = 70.0
+@export var preparation_fov: float = 60.0
 @export var contact_fov: float = 38.0
 @export var shot_follow_fov: float = 55.0
 # Keep gameplay cameras inside the stadium bowl so side/end stands do not occlude the shot.
@@ -158,9 +159,9 @@ func _goal_centered_transform(next_mode: StringName) -> Transform3D:
 		&"POWER_VIEW":
 			# Initial free-kick view: near player-eye perspective, about two meters behind the ball.
 			# Pulls back further, live, as RunUpState's drag distance grows (see set_runup_distance).
-			height = 1.65
+			height = 1.0
 			var pullback_t := clampf(_runup_distance_m / ShotCalculator.RUNUP_DISTANCE_MAX_M, 0.0, 1.0)
-			behind = 2.0 + pullback_t * runup_pullback_max_m
+			behind = 2.1 + pullback_t * runup_pullback_max_m
 			look_height = 0.45
 		&"SUPPORT_TOP_DOWN":
 			height = 8.0
@@ -190,7 +191,8 @@ func _goal_centered_transform(next_mode: StringName) -> Transform3D:
 		target = goal.lerp(ball, 0.40) + Vector3.UP * look_height
 	if next_mode == &"POWER_VIEW":
 		# Initial eye-level view behind the ball: look slightly higher so the horizon sits lower and feels less top-down.
-		target = ball + dir * 3.0 + Vector3.UP * 0.55
+		# Near-level composition: goal at mid-frame and ball in the lower foreground.
+		target = ball + dir * 20.0 + Vector3.UP * 0.1
 	return Transform3D(Basis.looking_at((target - origin).normalized(), Vector3.UP), origin)
 
 func _support_top_down_transform() -> Transform3D:
@@ -219,6 +221,8 @@ func _clamp_camera_origin(origin: Vector3) -> Vector3:
 
 func _fov_for_mode(next_mode: StringName) -> float:
 	match next_mode:
+		&"POWER_VIEW":
+			return preparation_fov
 		&"BALL_CONTACT_UI":
 			return contact_fov
 		&"SHOT_FOLLOW", &"FEEDBACK_REPLAY":

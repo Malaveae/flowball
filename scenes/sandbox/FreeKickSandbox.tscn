@@ -18,6 +18,9 @@
 [ext_resource type="Texture2D" uid="uid://dyiwun5yrhoe4" path="res://assets/Cesped/grass_roughness_1024.png" id="12_grass_roughness"]
 [ext_resource type="PackedScene" path="res://scenes/sandbox/GrassPatch.tscn" id="13_grass_patch"]
 [ext_resource type="Shader" path="res://assets/shaders/pitch_ground.gdshader" id="14_pitch_shader"]
+[ext_resource type="PackedScene" path="res://scenes/vfx/PostProcessLayer.tscn" id="15_post_process"]
+[ext_resource type="PackedScene" path="res://scenes/stadium/StadiumScoreboard.tscn" id="16_stadium_scoreboard"]
+[ext_resource type="PackedScene" path="res://scenes/stadium/StadiumBanners.tscn" id="17_stadium_banners"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_stadium"]
 sky_top_color = Color(0.32, 0.58, 0.88, 1)
@@ -35,10 +38,10 @@ sky = SubResource("Sky_stadium")
 ambient_light_source = 1
 ambient_light_color = Color(0.45, 0.52, 0.6, 1)
 tonemap_mode = 2
-ssao_enabled = true
+ssao_enabled = false
 ssao_intensity = 0.5
 ssao_power = 1.8
-glow_enabled = true
+glow_enabled = false
 glow_levels/1 = 0.04
 glow_levels/2 = 0.03
 glow_levels/3 = 0.02
@@ -952,3 +955,9 @@ transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 
 current = true
 
 [node name="FreeKickController" parent="." unique_id=1526173849 instance=ExtResource("3")]
+
+[node name="PostProcessLayer" parent="." instance=ExtResource("15_post_process")]
+
+[node name="StadiumScoreboard" parent="." instance=ExtResource("16_stadium_scoreboard")]
+
+[node name="StadiumBanners" parent="." instance=ExtResource("17_stadium_banners")]

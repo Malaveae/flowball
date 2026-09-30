@@ -41,13 +41,14 @@ func enter(_controller: FreeKickController) -> void:
 	if controller.camera_rig.mode != &"SUPPORT_TOP_DOWN":
 		controller.camera_rig.set_mode(&"SUPPORT_TOP_DOWN")
 	controller.ui.show_support_foot_sector(controller.input_data.selected_foot, controller.difficulty)
+	controller.ui.set_phase_time(controller.effective_step_time_limit(2), controller.effective_step_time_limit(2))
 	controller.ui.update_support_marker(Vector2(-radius * 0.55 if controller.input_data.selected_foot == "right" else radius * 0.55, 0.0))
 
 func _process(delta: float) -> void:
 	elapsed += delta
 	var time_limit := controller.effective_step_time_limit(2)
 	var remaining := maxf(0.0, time_limit - elapsed)
-	controller.ui.set_phase_progress(remaining / maxf(0.001, time_limit), "%.1fs" % remaining)
+	controller.ui.set_phase_time(remaining, time_limit)
 	if has_marker:
 		controller.ui.set_status("PLANT - slide to aim - release to shoot - %.1fs" % remaining)
 	else:

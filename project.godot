@@ -15,8 +15,13 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="Flowball Free Kick Prototype"
+config/version="2.0.0"
 run/main_scene="res://scenes/sandbox/FreeKickSandbox.tscn"
 config/features=PackedStringArray("4.7")
+
+[autoload]
+
+FlowballEventBus="*res://scripts/core/FlowballEventBus.gd"
 
 [display]
 
@@ -50,3 +55,8 @@ free_kick_switch_foot={
 
 3d/physics_engine="Jolt Physics"
 common/physics_interpolation=true
+
+[rendering]
+
+renderer/rendering_method="mobile"
+renderer/rendering_method.mobile="mobile"

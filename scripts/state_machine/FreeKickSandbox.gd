@@ -47,20 +47,31 @@ var current_spot_misses := 0
 var current_spot_goal_scored := false
 var game_over := false
 var completed_set_pieces: Array[Dictionary] = []
+@export var progress_path := FreeKickProgress.SAVE_PATH
+var progress := FreeKickProgress.new()
 var player_catalog: FreeKickPlayerCatalog = FreeKickPlayerCatalog.new()
 
 func _ready() -> void:
 	_setup_wall_dummies()
-	_find_grass_patch()
-	_setup_ground_shader()
+	# Legacy grass patches are superseded by the stadium kit.
+	# The visual kit supplies turf materials; gameplay ground collision is retained.
 	var goal_trigger := get_node_or_null("GoalTrigger") as GoalTrigger3D
 	if goal_trigger != null:
 		goal_trigger.goal_scored.connect(_on_goal_scored)
 	controller.free_kick_finished.connect(_on_free_kick_finished)
 	controller.shot_calculated.connect(_on_shot_calculated)
 	_load_player_catalog()
+	progress.load_progress(progress_path)
+	set_piece_number = int(progress.last_selected.get_slice(":", 1))
+	total_goals = progress.goals
+	total_attempts = progress.attempts
+	controller.ui.result_action_requested.connect(handle_result_action)
+	controller.ui.shot_selected.connect(select_unlocked_shot)
 	_generate_set_piece()
 	_apply_set_piece_spot()
+	var art := TVArcadeArt.new()
+	add_child(art)
+	art.install(self)
 	# Start immediately for prototype. In production, match controller would call this.
 	_start_attempt(controller.preferred_kicking_foot())
 
@@ -74,26 +85,62 @@ func _load_player_catalog() -> void:
 	controller.set_player_profile(default_profile)
 
 func cycle_set_piece_spot() -> void:
-	if game_over:
+	handle_result_action(&"next")
+
+func start_new_attempt(_selected_foot: String = "right") -> void:
+	handle_result_action(&"primary")
+
+func handle_result_action(action: StringName) -> void:
+	if not progress.result_ready:
 		return
-	_advance_to_next_set_piece()
+	match action:
+		&"choose":
+			controller.ui.show_shot_selector(progress.unlocked, progress.completed, set_piece_number)
+		&"next":
+			if progress.won and set_piece_number < FreeKickProgress.CATALOG_SIZE:
+				select_unlocked_shot(set_piece_number + 1)
+		&"primary", &"repeat":
+			if action == &"primary" and progress.won and set_piece_number < FreeKickProgress.CATALOG_SIZE:
+				select_unlocked_shot(set_piece_number + 1)
+				return
+			if progress.won or progress.misses >= MAX_TRIALS_PER_SET_PIECE or action == &"repeat":
+				progress.reset_local_attempts()
+				current_spot_attempts = 0
+			current_spot_misses = progress.misses
+			game_over = false
+			_start_attempt(controller.input_data.selected_foot)
+
+func select_unlocked_shot(index: int) -> void:
+	if not progress.result_ready or not progress.select_shot(index):
+		return
+	set_piece_number = index
+	current_spot_attempts = 0
+	current_spot_misses = 0
+	game_over = false
+	_generate_set_piece()
+	_apply_set_piece_spot()
+	_save_progress()
 	_start_attempt(controller.input_data.selected_foot)
 
-func start_new_attempt(selected_foot: String = "right") -> void:
-	if game_over or current_spot_goal_scored:
-		return
-	_start_attempt(selected_foot)
+func _save_progress() -> void:
+	var error := progress.save_progress(progress_path)
+	if error != OK:
+		push_warning("Could not save Flowball progress: %s" % error_string(error))
 
 func _apply_set_piece_spot() -> void:
 	var ball_position := current_set_piece["position"] as Vector3
 	controller.set_free_kick_spot(String(current_set_piece["label"]), ball_position, GOAL_CENTER)
 	controller.environment.set_piece_seed = set_piece_number
 	_position_wall_dummies(ball_position, int(current_set_piece.get("wall_count", DEFAULT_WALL_PLAYER_COUNT)))
+	var event_bus := get_node_or_null("/root/FlowballEventBus")
+	if event_bus != null:
+		event_bus.emit_signal(&"set_piece_changed", set_piece_number, String(current_set_piece["label"]), controller.environment.distance_to_goal)
 	_update_scoreboard()
 
 func _start_attempt(selected_foot: String) -> void:
 	if game_over:
 		return
+	progress.begin_attempt()
 	current_spot_attempts += 1
 	current_spot_goal_scored = false
 	controller.environment.wind_vector = current_set_piece.get("wind", Vector3.ZERO) as Vector3
@@ -103,36 +150,18 @@ func _start_attempt(selected_foot: String) -> void:
 		goalkeeper.call("reset_for_free_kick")
 		goalkeeper.call("set_ready")
 	controller.start_free_kick(selected_foot)
+	var event_bus := get_node_or_null("/root/FlowballEventBus")
+	if event_bus != null:
+		event_bus.emit_signal(&"attempt_started", current_spot_attempts, selected_foot)
 	_update_scoreboard()
 
-func _advance_to_next_set_piece() -> void:
-	set_piece_number += 1
-	current_spot_attempts = 0
-	current_spot_misses = 0
-	current_spot_goal_scored = false
-	_generate_set_piece()
-	_apply_set_piece_spot()
-
 func _on_goal_scored() -> void:
-	if current_spot_goal_scored:
+	if current_spot_goal_scored or progress.result_ready or not controller.state_machine.current_state is ExecuteShotState:
 		return
+	# Goal detection records intent; FeedbackState is the only attempt-closing boundary.
 	current_spot_goal_scored = true
-	total_goals += 1
-	total_attempts += 1
-	completed_set_pieces.append({
-		"label": String(current_set_piece["label"]),
-		"attempts": current_spot_attempts,
-	})
 	if controller.ui != null:
-		controller.ui.show_result_banner("GOAL!", "SET PIECE #%02d COMPLETED IN %d ATTEMPT%s" % [set_piece_number, current_spot_attempts, "" if current_spot_attempts == 1 else "S"], Color(0.0, 0.95, 1.0))
-		var camera := controller.camera_rig.get_camera()
-		controller.ui.show_impact_pulse(GOAL_CENTER, camera, "GOAL!", Color(0.0, 0.95, 1.0))
-	_update_scoreboard("GOAL! %s completed in %d attempt%s. Next set piece..." % [String(current_set_piece["label"]), current_spot_attempts, "" if current_spot_attempts == 1 else "s"])
-	await get_tree().create_timer(1.25).timeout
-	if game_over:
-		return
-	_advance_to_next_set_piece()
-	_start_attempt(controller.input_data.selected_foot)
+		controller.ui.show_impact_pulse(GOAL_CENTER, controller.camera_rig.get_camera(), "GOAL!", HudTheme.GREEN_SUCCESS)
 
 func _on_shot_calculated(shot_params: ShotParams) -> void:
 	_trigger_wall_jump_reactions()
@@ -140,24 +169,19 @@ func _on_shot_calculated(shot_params: ShotParams) -> void:
 		goalkeeper.call("react_to_shot", shot_params, _predict_target_at_goal(shot_params))
 
 func _on_free_kick_finished(report: Resource) -> void:
-	if game_over or current_spot_goal_scored:
+	var goal: bool = current_spot_goal_scored or (report != null and report.get("outcome") == &"goal")
+	if not progress.close_attempt(controller.run_id, set_piece_number, goal):
 		return
-	total_attempts += 1
-	if report != null and report.get("outcome") == &"goal":
-		if goalkeeper != null:
-			goalkeeper.call("play_goal_conceded_reaction")
-		return
-	current_spot_misses = mini(current_spot_misses + 1, MAX_TRIALS_PER_SET_PIECE)
+	current_spot_goal_scored = goal
+	total_goals = progress.goals
+	total_attempts = progress.attempts
+	current_spot_misses = progress.misses
+	game_over = progress.misses >= MAX_TRIALS_PER_SET_PIECE
+	if goal and goalkeeper != null:
+		goalkeeper.call("play_goal_conceded_reaction")
 	_update_scoreboard()
-	if current_spot_misses >= MAX_TRIALS_PER_SET_PIECE:
-		_game_over()
-
-func _game_over() -> void:
-	game_over = true
-	_update_scoreboard("GAME OVER - failed to score in %d trials." % MAX_TRIALS_PER_SET_PIECE)
-	if controller != null and controller.ui != null:
-		controller.ui.hide_all()
-		controller.ui.show_game_over("GAME OVER - failed to score in %d trials. Press R to restart run." % MAX_TRIALS_PER_SET_PIECE)
+	_save_progress()
+	controller.ui.show_result_actions(goal, game_over, set_piece_number < FreeKickProgress.CATALOG_SIZE)
 
 func _update_scoreboard(message: String = "") -> void:
 	if controller != null and controller.ui != null:
@@ -165,6 +189,9 @@ func _update_scoreboard(message: String = "") -> void:
 			controller.ui.set_run_hud(set_piece_number, total_goals, total_attempts, current_spot_misses, MAX_TRIALS_PER_SET_PIECE, message)
 		else:
 			controller.ui.set_scoreboard(_scoreboard_text(message))
+	var event_bus := get_node_or_null("/root/FlowballEventBus")
+	if event_bus != null:
+		event_bus.emit_signal(&"stats_updated", total_goals, total_attempts, current_spot_misses, MAX_TRIALS_PER_SET_PIECE)
 
 func _scoreboard_text(message: String = "") -> String:
 	var trials_left: int = maxi(0, MAX_TRIALS_PER_SET_PIECE - current_spot_attempts)
@@ -172,19 +199,6 @@ func _scoreboard_text(message: String = "") -> String:
 	if message != "":
 		text += "\n%s" % message
 	return text
-
-func _restart_run() -> void:
-	game_over = false
-	set_piece_number = 1
-	total_goals = 0
-	total_attempts = 0
-	current_spot_attempts = 0
-	current_spot_misses = 0
-	current_spot_goal_scored = false
-	completed_set_pieces.clear()
-	_generate_set_piece()
-	_apply_set_piece_spot()
-	_start_attempt(controller.input_data.selected_foot)
 
 func _generate_set_piece() -> void:
 	var difficulty_step: int = set_piece_number - 1
@@ -385,6 +399,10 @@ func _roll_wall_heights(active_wall_count: int) -> Array[float]:
 	return heights
 
 func _apply_wall_dummy_height(dummy: Node3D, height: float) -> void:
+	var visual := dummy.get_node_or_null("ArcadeWallPlayer") as Node3D
+	if visual != null:
+		visual.scale = Vector3.ONE * height / WALL_PLAYER_HEIGHT
+		visual.position.y = -height * 0.5
 	for child in dummy.get_children():
 		if child is CollisionShape3D:
 			var collision := child as CollisionShape3D
@@ -433,11 +451,9 @@ func _jump_wall_dummy(dummy: Node3D, rng: RandomNumberGenerator) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("free_kick_restart"):
-		if game_over:
-			_restart_run()
-		else:
-			_start_attempt(controller.input_data.selected_foot)
+		if not controller.ui.is_selector_open():
+			handle_result_action(&"primary")
 		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("free_kick_switch_foot"):
+	elif event.is_action_pressed("free_kick_switch_foot") and not progress.result_ready:
 		controller._on_switch_foot_requested()
 		get_viewport().set_input_as_handled()

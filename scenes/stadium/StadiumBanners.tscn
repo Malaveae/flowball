@@ -1,0 +1,133 @@
+[gd_scene format=3 uid="uid://b2qx4vq7fhnk8"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_banner_navy"]
+albedo_color = Color(0.06, 0.09, 0.16, 1.0)
+roughness = 0.85
+metallic = 0.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_banner_cyan"]
+albedo_color = Color(0.0, 0.5, 0.7, 0.85)
+roughness = 0.7
+metallic = 0.0
+emission_enabled = true
+emission = Color(0.0, 0.25, 0.35, 1.0)
+emission_energy_multiplier = 0.15
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_banner_orange"]
+albedo_color = Color(0.7, 0.35, 0.0, 0.85)
+roughness = 0.7
+metallic = 0.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_frame"]
+albedo_color = Color(0.12, 0.12, 0.14, 1.0)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_archive_sign"]
+albedo_color = Color(0.035, 0.055, 0.10, 1.0)
+roughness = 0.5
+emission_enabled = true
+emission = Color(0.0, 0.3, 0.5, 1.0)
+emission_energy_multiplier = 0.08
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sign_frame"]
+albedo_color = Color(0.3, 0.3, 0.35, 1.0)
+roughness = 0.6
+metallic = 0.3
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_distance_mark"]
+albedo_color = Color(0.0, 0.8, 1.0, 0.5)
+roughness = 0.6
+metallic = 0.0
+transparency = 1
+
+[sub_resource type="QuadMesh" id="QuadMesh_banner"]
+size = Vector2(4.0, 1.5)
+
+[sub_resource type="BoxMesh" id="BoxMesh_banner_frame"]
+size = Vector3(4.1, 0.05, 1.55)
+
+[sub_resource type="QuadMesh" id="QuadMesh_archive_sign"]
+size = Vector2(8.0, 3.0)
+
+[sub_resource type="BoxMesh" id="BoxMesh_archive_frame"]
+size = Vector3(8.2, 0.08, 3.2)
+
+[sub_resource type="QuadMesh" id="QuadMesh_distance_mark"]
+size = Vector2(0.4, 0.4)
+
+[node name="StadiumBanners" type="Node3D"]
+
+[node name="BannerLeft1" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -34, 2.5, -18)
+mesh = SubResource("QuadMesh_banner")
+surface_material_override/0 = SubResource("StandardMaterial3D_banner_navy")
+
+[node name="BannerLeft1Frame" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -34.03, 2.5, -18)
+mesh = SubResource("BoxMesh_banner_frame")
+surface_material_override/0 = SubResource("StandardMaterial3D_frame")
+
+[node name="BannerLeft2" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -34, 2.5, -8)
+mesh = SubResource("QuadMesh_banner")
+surface_material_override/0 = SubResource("StandardMaterial3D_banner_cyan")
+
+[node name="BannerLeft2Frame" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -34.03, 2.5, -8)
+mesh = SubResource("BoxMesh_banner_frame")
+surface_material_override/0 = SubResource("StandardMaterial3D_frame")
+
+[node name="BannerLeft3" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -34, 2.5, 2)
+mesh = SubResource("QuadMesh_banner")
+surface_material_override/0 = SubResource("StandardMaterial3D_banner_orange")
+
+[node name="BannerLeft3Frame" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -34.03, 2.5, 2)
+mesh = SubResource("BoxMesh_banner_frame")
+surface_material_override/0 = SubResource("StandardMaterial3D_frame")
+
+[node name="BannerRight1" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 34, 2.5, -18)
+mesh = SubResource("QuadMesh_banner")
+surface_material_override/0 = SubResource("StandardMaterial3D_banner_cyan")
+
+[node name="BannerRight1Frame" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 34.03, 2.5, -18)
+mesh = SubResource("BoxMesh_banner_frame")
+surface_material_override/0 = SubResource("StandardMaterial3D_frame")
+
+[node name="BannerRight2" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 34, 2.5, -8)
+mesh = SubResource("QuadMesh_banner")
+surface_material_override/0 = SubResource("StandardMaterial3D_banner_orange")
+
+[node name="BannerRight2Frame" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 34.03, 2.5, -8)
+mesh = SubResource("BoxMesh_banner_frame")
+surface_material_override/0 = SubResource("StandardMaterial3D_frame")
+
+[node name="BannerRight3" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 34, 2.5, 2)
+mesh = SubResource("QuadMesh_banner")
+surface_material_override/0 = SubResource("StandardMaterial3D_banner_navy")
+
+[node name="BannerRight3Frame" type="MeshInstance3D" parent="."]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 34.03, 2.5, 2)
+mesh = SubResource("BoxMesh_banner_frame")
+surface_material_override/0 = SubResource("StandardMaterial3D_frame")
+
+[node name="ArchiveSign" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 12, -59)
+mesh = SubResource("QuadMesh_archive_sign")
+surface_material_override/0 = SubResource("StandardMaterial3D_archive_sign")
+
+[node name="ArchiveSignFrame" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 12, -59.03)
+mesh = SubResource("BoxMesh_archive_frame")
+surface_material_override/0 = SubResource("StandardMaterial3D_sign_frame")
+
+[node name="DistanceMark" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0.5, 0.02, 0.5)
+mesh = SubResource("QuadMesh_distance_mark")
+surface_material_override/0 = SubResource("StandardMaterial3D_distance_mark")

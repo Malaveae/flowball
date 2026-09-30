@@ -13,7 +13,7 @@ func _run() -> void:
 	var ui := _scene.get_node("FreeKickUI") as FreeKickUI
 	ui.set_run_hud(2, 5, 8, 1, 3, "test")
 
-	var hud := ui.score_hud as FreeKickUI.ModernScoreHud
+	var hud := ui.score_hud as ArcadeScoreHud
 	_passed = hud != null \
 		and hud.level == 2 \
 		and hud.goals == 5 \

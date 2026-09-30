@@ -13,9 +13,9 @@ extends MeshInstance3D
 @export var visual_radius_m: float = 1.6
 @export var arc_segments: int = 24
 @export var marker_dot_radius_m: float = 0.09
-## Above the grass, below both the ball's underside (~0.05, from resting y=0.16 - radius 0.11)
-## and FootballFieldMarkings3D.LINE_Y (0.062) - avoids z-fighting with either.
-@export var ground_y: float = 0.03
+## Above the visual turf (0.047 m) and its blades (up to ~0.084 m).
+## Presentation only: pitch and ball colliders remain unchanged.
+@export var ground_y: float = 0.095
 ## Dims the inactive half's wedge to this fraction of the active half's alpha, so the full
 ## 180 degrees stays visible while the current foot's half reads as clearly highlighted.
 @export var inactive_alpha_scale: float = 0.35

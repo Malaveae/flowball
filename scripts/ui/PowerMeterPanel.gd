@@ -1,7 +1,7 @@
 class_name PowerMeterPanel
 extends Control
 
-const BOOT_TEXTURE := preload("res://assets/PumaAttacantoIZQ.png")
+const BOOT_TEXTURE := preload("res://assets/ui/tv_arcade/boot_clean.png")
 
 @export_enum("right", "left") var kicking_foot: String = "right":
 	set(value):
@@ -48,12 +48,6 @@ func _draw() -> void:
 	_draw_vertical_segment(inner, 0.40, 0.70, Color(0.25, 1.0, 0.25, 0.78), Color(0.55, 1.0, 0.0, 0.20))
 	_draw_vertical_segment(inner, 0.70, 0.85, Color(1.0, 0.92, 0.0, 0.88), Color(1.0, 0.65, 0.0, 0.24))
 	_draw_vertical_segment(inner, 0.85, 1.0, Color(1.0, 0.16, 0.08, 0.84), Color(1.0, 0.35, 0.16, 0.22))
-
-	var fill_height := inner.size.y * power_value
-	if fill_height > 0.0:
-		var fill_rect := Rect2(inner.position.x, inner.end.y - fill_height, inner.size.x, fill_height)
-		draw_rect(fill_rect.grow(3.0), _power_color(power_value, 0.22), true)
-		draw_rect(fill_rect, _power_color(power_value, 0.78), true)
 
 	for i in range(0, 11):
 		var t := float(i) / 10.0
@@ -114,12 +108,12 @@ func _draw_power_pill(inner: Rect2, pointer_y: float, color: Color) -> void:
 	var pill_pos := Vector2(inner.get_center().x - pill_size.x * 0.5, clampf(pointer_y - pill_size.y * 0.5, 6.0, size.y - pill_size.y - 30.0))
 	var rect := Rect2(pill_pos, pill_size)
 	draw_style_box(HudTheme.pill_style(color), rect)
-	draw_string(font, rect.position + Vector2(0.0, 17.0), "%d%%" % roundi(power_value * 100.0), HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 14, Color(1.0, 1.0, 1.0, 0.95))
+	draw_string(font, rect.position + Vector2(0.0, 17.0), "%d%%" % roundi(power_value * 100.0), HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 20, Color(1.0, 1.0, 1.0, 0.95))
 
 func _draw_kicking_boot(rect: Rect2) -> void:
 	var center := rect.get_center()
 	var scale := Vector2(-1.0, 1.0) if kicking_foot == "right" else Vector2.ONE
-	draw_set_transform(center, 0.0, scale)
+	draw_set_transform(center, HudTheme.BOOT_FORWARD_ROTATION, scale)
 	var local_rect := Rect2(-rect.size * 0.5, rect.size)
 	if boot_texture != null:
 		draw_texture_rect(boot_texture, local_rect, false, Color(1.0, 1.0, 1.0, 0.96))
@@ -145,10 +139,10 @@ func _draw_zone_label(rect: Rect2, t: float, label: String, color: Color, font: 
 	var y := rect.end.y - rect.size.y * t + 5.0
 	if on_left:
 		var text_x := rect.position.x - 104.0
-		draw_string(font, Vector2(text_x, y), label, HORIZONTAL_ALIGNMENT_RIGHT, 96.0, 12, color)
+		draw_string(font, Vector2(text_x, y), label, HORIZONTAL_ALIGNMENT_RIGHT, 96.0, 17, color)
 	else:
 		var text_x := rect.end.x + 40.0
-		draw_string(font, Vector2(text_x, y), label, HORIZONTAL_ALIGNMENT_LEFT, 96.0, 12, color)
+		draw_string(font, Vector2(text_x, y), label, HORIZONTAL_ALIGNMENT_LEFT, 96.0, 17, color)
 
 func _power_color(value: float, alpha: float) -> Color:
 	return HudTheme.power_zone_color(value, alpha)

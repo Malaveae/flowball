@@ -19,6 +19,7 @@ var free_kick_position: Vector3 = Vector3(0.0, 0.16, 0.0)
 var spot_label: String = "Center 24m"
 var active_profile_id: String = ""
 var active_profile: FreeKickPlayerProfile
+var _previous_state_name: StringName = &""
 var _step2_end_msec: int = 0  # transient: timestamp when step 2 committed, used for step2→3 speed bonus
 var step2_time_limit_effective: float = -1.0  # set at PowerState release; power pressure scales the step 2 budget
 var step3_time_limit_effective: float = -1.0  # set at PowerState release; power pressure scales the step 3 budget
@@ -73,6 +74,7 @@ func set_free_kick_spot(label: String, ball_position: Vector3, goal_position: Ve
 
 func start_free_kick(selected_foot: String = "right") -> void:
 	run_id += 1
+	_previous_state_name = &""
 	step2_time_limit_effective = -1.0
 	step3_time_limit_effective = -1.0
 	input_data = FreeKickInputData.new()
@@ -119,6 +121,8 @@ func _on_restart_requested() -> void:
 	restart_attempt()
 
 func _on_switch_foot_requested() -> void:
+	if not state_machine.current_state is RunUpState:
+		return
 	var next_foot := "left" if input_data.selected_foot == "right" else "right"
 	start_free_kick(next_foot)
 
@@ -130,6 +134,10 @@ func _on_next_spot_requested() -> void:
 func _on_state_changed(state_name: StringName) -> void:
 	if ui != null:
 		ui.set_status("State: %s" % String(state_name))
+	var event_bus := get_node_or_null("/root/FlowballEventBus")
+	if event_bus != null:
+		event_bus.emit_signal(&"phase_changed", String(_previous_state_name), String(state_name))
+	_previous_state_name = state_name
 
 func _reset_ball_for_sandbox() -> void:
 	if shot_observer != null and shot_observer.recording:

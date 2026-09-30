@@ -24,6 +24,7 @@ func enter(_controller: FreeKickController) -> void:
 	swipe_cap_px = ball_radius_px * ContactGesture.l_max(controller.input_data.power_normalized, curve_stat, controller.difficulty)
 	controller.camera_rig.set_mode(&"BALL_CONTACT_UI")
 	controller.ui.show_ball_contact_ui()
+	controller.ui.set_phase_time(controller.effective_step_time_limit(3), controller.effective_step_time_limit(3))
 	controller.ui.set_status("Step 3: point on ball, then drag follow-through")
 
 func _process(delta: float) -> void:
@@ -31,7 +32,7 @@ func _process(delta: float) -> void:
 	controller.ui.align_ball_contact_overlay(controller.get_ball(), controller.camera_rig.get_camera())
 	var time_limit := controller.effective_step_time_limit(3)
 	var remaining := maxf(0.0, time_limit - elapsed)
-	controller.ui.set_phase_progress(remaining / maxf(0.001, time_limit), "%.1fs" % remaining)
+	controller.ui.set_phase_time(remaining, time_limit)
 	controller.ui.set_status("CONTACT - point and drag - %.1fs" % remaining)
 	if touching:
 		swipe_duration += delta

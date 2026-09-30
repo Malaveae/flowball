@@ -1,0 +1,8 @@
+Built-in image generation edit, 2026-09-30.
+Source: assets/ui/tv_arcade/boot.png
+Output: boot_clean.png (RGBA, transparent_background=true)
+Generation ID: exec-0aedfbd3-5c7c-4ca8-b287-cb327ef59fb2
+
+Clean up this exact small game UI boot sprite. Output one isolated boot on a genuinely transparent alpha background. REMOVE the broad straight white/ivory rectangular strips and white corner slabs that currently surround the left and right sides and tips of the blue shoe. The silhouette must follow only the blue/navy shoe upper with a very thin dark navy sole edge: no white outer border, no white fringe, no halo, no rectangular base, no background pixels, no drop shadow outside the shoe. Keep the existing low polygon cel-shaded blue boot design, white laces INSIDE the boot, dark navy heel opening, same proportions, single straight orthographic top view. CRITICAL preserve orientation: TOE points DOWN toward bottom of image; dark round heel/ankle opening at TOP of image. No rotation, no perspective, no added second shoe, no lettering, no ground. Clean anti-aliased alpha edge ready to draw over green grass in Godot.
+
+Runtime uses HudTheme.BOOT_FORWARD_ROTATION to point the toe up before applying the support aim angle. Both power and support use this cleaned image; the original Blender render is preserved for regeneration and reference.

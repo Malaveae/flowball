@@ -1,0 +1,107 @@
+[gd_scene format=3]
+
+[node name="ScoreboardUI" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 512.0
+offset_bottom = 192.0
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.0392157, 0.054902, 0.101961, 1)
+
+[node name="TitleLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 12.0
+offset_top = 8.0
+offset_right = 300.0
+offset_bottom = 24.0
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "FLOWBALL WORLD ARCHIVE"
+vertical_alignment = 1
+
+[node name="SetPieceLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 156.0
+offset_top = 32.0
+offset_right = 356.0
+offset_bottom = 56.0
+theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(0, 0.8, 1, 1)
+text = "SET PIECE 01"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ConversionLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 16.0
+offset_top = 84.0
+offset_right = 220.0
+offset_bottom = 116.0
+theme_override_font_sizes/font_size = 24
+theme_override_colors/font_color = Color(1, 0.55, 0, 1)
+text = "CONVERSION 0%"
+vertical_alignment = 1
+
+[node name="StatsLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 220.0
+offset_top = 84.0
+offset_right = 292.0
+offset_bottom = 116.0
+theme_override_font_sizes/font_size = 24
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "0/0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="MissesLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 340.0
+offset_top = 88.0
+offset_right = 500.0
+offset_bottom = 116.0
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(1, 0.55, 0, 1)
+text = "MISSES ○○○"
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="StepsContainer" type="HBoxContainer" parent="."]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 156.0
+offset_right = 512.0
+offset_bottom = 188.0
+theme_override_constants/separation = 16
+alignment = 1
+
+[node name="Step1Label" type="Label" parent="StepsContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(1, 0.9, 0, 1)
+text = "[1] POWER"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Step2Label" type="Label" parent="StepsContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
+text = "[2] PLANT"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Step3Label" type="Label" parent="StepsContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
+text = "[3] KICK"
+horizontal_alignment = 1
+vertical_alignment = 1

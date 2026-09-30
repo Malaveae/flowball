@@ -1,0 +1,7 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3]
+
+[ext_resource type="Shader" path="res://assets/shaders/tv_arcade_cel.gdshader" id="1"]
+
+[resource]
+shader = ExtResource("1")
+shader_parameter/base_color = Color(0.687217, 0.171844, 0.826657, 1.0)

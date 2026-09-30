@@ -1,0 +1,46 @@
+[gd_scene format=3 load_steps=7]
+
+[ext_resource type="Script" path="res://scripts/stadium/stadium_scoreboard.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://scenes/stadium/ScoreboardUI.tscn" id="2_ui"]
+
+[sub_resource type="ViewportTexture" id="ViewportTexture_screen"]
+viewport_path = NodePath("ScoreboardViewport")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_screen"]
+resource_local_to_scene = true
+albedo_texture = SubResource("ViewportTexture_screen")
+emission_enabled = true
+emission = Color(1, 1, 1, 1)
+emission_energy_multiplier = 0.3
+
+[sub_resource type="QuadMesh" id="QuadMesh_screen"]
+size = Vector2(6, 2.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_backing"]
+size = Vector3(6.2, 2.6, 0.15)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_backing"]
+albedo_color = Color(0.1, 0.1, 0.1, 1)
+
+[node name="StadiumScoreboard" type="Node3D"]
+script = ExtResource("1_script")
+sub_viewport_path = NodePath("ScoreboardViewport")
+scoreboard_ui_path = NodePath("ScoreboardViewport/ScoreboardUI")
+
+[node name="ScoreboardViewport" type="SubViewport" parent="."]
+transparent_bg = true
+handle_input_locally = false
+size = Vector2i(512, 192)
+render_target_update_mode = 4
+
+[node name="ScoreboardUI" parent="ScoreboardViewport" instance=ExtResource("2_ui")]
+
+[node name="ScreenMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 10, -54)
+mesh = SubResource("QuadMesh_screen")
+surface_material_override/0 = SubResource("StandardMaterial3D_screen")
+
+[node name="BackingMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 10, -54.15)
+mesh = SubResource("BoxMesh_backing")
+surface_material_override/0 = SubResource("StandardMaterial3D_backing")
